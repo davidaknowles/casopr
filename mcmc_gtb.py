@@ -21,10 +21,10 @@ def mcmc(a, b, phi, sst_dict, n, ld_blk, blk_size, n_iter, n_burnin, thin, chrom
 
     # derived stats
     beta_mrg = sp.array(sst_dict['BETA'], ndmin=2).T
-    maf = sp.array(sst_dict['MAF'], ndmin=2).T
-    n_pst = (n_iter-n_burnin)/thin
-    p = len(sst_dict['SNP'])
-    n_blk = len(ld_blk)
+    maf = sp.array(sst_dict['MAF'], ndmin=2).T # only used to rescale beta after inference
+    n_pst = (n_iter-n_burnin)/thin # number of MCMC samples to return
+    p = len(sst_dict['SNP']) # number of SNPs
+    n_blk = len(ld_blk) # number of LD blocks
 
     # initialization
     beta = sp.zeros((p,1))
@@ -97,5 +97,3 @@ def mcmc(a, b, phi, sst_dict, n, ld_blk, blk_size, n_iter, n_burnin, thin, chrom
         print('... Estimated global shrinkage parameter: %1.2e ...' % phi_est )
 
     print('... Done ...')
-
-

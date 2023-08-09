@@ -76,6 +76,7 @@ import getopt
 import parse_genet
 import mcmc_gtb
 import gigrnd
+import vi
 
 
 def parse_param():
@@ -157,9 +158,12 @@ def main():
 
         ld_blk, blk_size = parse_genet.parse_ldblk(param_dict['ref_dir'], sst_dict, int(chrom))
 
-        mcmc_gtb.mcmc(param_dict['a'], param_dict['b'], param_dict['phi'], sst_dict, param_dict['n_gwas'], ld_blk, blk_size,
-            param_dict['n_iter'], param_dict['n_burnin'], param_dict['thin'], int(chrom), param_dict['out_dir'], param_dict['beta_std'], param_dict['seed'])
+        #mcmc_gtb.mcmc(param_dict['a'], param_dict['b'], param_dict['phi'], sst_dict, param_dict['n_gwas'], ld_blk, blk_size,
+        #    param_dict['n_iter'], param_dict['n_burnin'], param_dict['thin'], int(chrom), param_dict['out_dir'], param_dict['beta_std'], param_dict['seed'])
 
+        vi.vi(param_dict['phi'], sst_dict, param_dict['n_gwas'], ld_blk, blk_size, 
+            param_dict['n_iter'], int(chrom), param_dict['out_dir'], param_dict['beta_std'], param_dict['seed'])
+        
         print('\n')
 
 
@@ -167,3 +171,47 @@ if __name__ == '__main__':
     main()
 
 
+chrom = 22
+
+param_dict = {
+    'ref_dir' : "../ld/ldblk_1kg_eur", 
+    'bim_prefix' : "test_data/test", 
+    'sst_file' : "test_data/sumstats.txt", 
+    'n_gwas' : 200000, 
+    'phi' : 1e-2, 
+    'out_dir' : "test_data",
+    "seed" : 42, 
+    "beta_std" : "False", 
+    "n_iter" : 1000,
+    'a': 1, 
+    'b': 0.5, 
+    'n_burnin': 500,
+    'thin': 5
+}
+
+if '1kg' in os.path.basename(param_dict['ref_dir']):
+    ref_dict = parse_genet.parse_ref(param_dict['ref_dir'] + '/snpinfo_1kg_hm3', int(chrom))
+elif 'ukbb' in os.path.basename(param_dict['ref_dir']):
+    ref_dict = parse_genet.parse_ref(param_dict['ref_dir'] + '/snpinfo_ukbb_hm3', int(chrom))
+
+vld_dict = parse_genet.parse_bim(param_dict['bim_prefix'], int(chrom))
+
+sst_dict = parse_genet.parse_sumstats(ref_dict, vld_dict, param_dict['sst_file'], param_dict['n_gwas'])
+
+ld_blk, ld_blk_sym, blk_size = parse_genet.parse_ldblk(param_dict['ref_dir'], sst_dict, chrom)
+
+#mcmc_gtb.mcmc(param_dict['a'], param_dict['b'], param_dict['phi'], sst_dict, param_dict['n_gwas'], ld_blk, blk_size, param_dict['n_iter'], param_dict['n_burnin'], param_dict['thin'], int(chrom), param_dict['out_dir'], param_dict['beta_std'], param_dict['seed'])
+
+import importlib
+importlib.reload(vi)
+importlib.reload(parse_genet)
+
+# collapsed converges in about 100 iterations (random init or zero init)
+losses = vi.vi(param_dict['phi'], sst_dict, param_dict['n_gwas'], ld_blk, blk_size, param_dict['n_iter'], chrom, param_dict['out_dir'], param_dict['beta_std'], param_dict['seed'], collapsed = False, structured_guide = True, eps = 1e-3, stall_window = 30, max_particles = 4)
+
+# estimated phi=0.017, seems reasonable? 
+
+plt.plot(losses)
+
+# -1813 with collapsed model.
+# 1066797075 with uncollapsed! 

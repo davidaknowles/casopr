@@ -163,23 +163,29 @@ def parse_ldblk(ldblk_dir, sst_dict, chrom):
         snp_blk.append([bb.decode("UTF-8") for bb in list(hdf_chr['blk_'+str(blk)]['snplist'])])
 
     blk_size = []
+    ld_blk_sym = []
+    ld_blk_filt = []
     mm = 0
     for blk in range(n_blk):
         idx = [ii for (ii, snp) in enumerate(snp_blk[blk]) if snp in sst_dict['SNP']]
+        
+        if len(idx) == 0: continue
+        
         blk_size.append(len(idx))
-        if idx != []:
-            idx_blk = range(mm,mm+len(idx))
-            flip = [sst_dict['FLP'][jj] for jj in idx_blk]
-            ld_blk[blk] = ld_blk[blk][sp.ix_(idx,idx)]*sp.outer(flip,flip)
+        
+        idx_blk = range(mm,mm+len(idx))
+        flip = [sst_dict['FLP'][jj] for jj in idx_blk]
+        ld_blk_here = ld_blk[blk][sp.ix_(idx,idx)]*sp.outer(flip,flip)
+        ld_blk_filt.append(ld_blk_here)
+        
+        #_, s, v = linalg.svd(ld_blk_here)
+        #h = sp.dot(v.T, sp.dot(sp.diag(s), v)) # just weird way of getting transpose?! 
+        #ld_blk_sym.append( (ld_blk_here+h)/2 )
+        
+        ld_blk_sym.append( (ld_blk_here+ld_blk_here.T)/2 )
 
-            _, s, v = linalg.svd(ld_blk[blk])
-            h = sp.dot(v.T, sp.dot(sp.diag(s), v))
-            ld_blk[blk] = (ld_blk[blk]+h)/2            
-
-            mm += len(idx)
-        else:
-            ld_blk[blk] = sp.array([])
-
-    return ld_blk, blk_size
+        mm += len(idx)
+        
+    return ld_blk_filt, ld_blk_sym, blk_size
 
 
