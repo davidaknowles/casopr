@@ -8,63 +8,29 @@ Parse the reference panel, summary statistics, and validation set.
 
 import os
 import scipy as sp
+import numpy as np
 from scipy.stats import norm
 from scipy import linalg
 import h5py
+import pandas as pd
 
 
-def parse_ref(ref_file, chrom):
+def parse_ref(ref_file):
     print('... parse reference file: %s ...' % ref_file)
+    return pd.read_csv(ref_file, sep="\t")
 
-    ref_dict = {'CHR':[], 'SNP':[], 'BP':[], 'A1':[], 'A2':[], 'MAF':[]}
-    with open(ref_file) as ff:
-        header = next(ff)
-        for line in ff:
-            ll = (line.strip()).split()
-            if int(ll[0]) == chrom:
-                ref_dict['CHR'].append(chrom)
-                ref_dict['SNP'].append(ll[1])
-                ref_dict['BP'].append(int(ll[2]))
-                ref_dict['A1'].append(ll[3])
-                ref_dict['A2'].append(ll[4])
-                ref_dict['MAF'].append(float(ll[5]))
-
-    print('... %d SNPs on chromosome %d read from %s ...' % (len(ref_dict['SNP']), chrom, ref_file))
-    return ref_dict
-
-
-def parse_bim(bim_file, chrom):
-    print('... parse bim file: %s ...' % (bim_file + '.bim'))
-
-    vld_dict = {'SNP':[], 'A1':[], 'A2':[]}
-    with open(bim_file + '.bim') as ff:
-        for line in ff:
-            ll = (line.strip()).split()
-            if int(ll[0]) == chrom:
-                vld_dict['SNP'].append(ll[1])
-                vld_dict['A1'].append(ll[4])
-                vld_dict['A2'].append(ll[5])
-
-    print('... %d SNPs on chromosome %d read from %s ...' % (len(vld_dict['SNP']), chrom, bim_file + '.bim'))
-    return vld_dict
+def parse_bim(bim_file):
+    
+    return pd.read_csv(bim_file, sep="\t", names = ["CHR", "SNP", "huh", "pos", "A1", "A2"], usecols = ["CHR", "SNP", "A1", "A2"])
 
 
 def parse_sumstats(ref_dict, vld_dict, sst_file, n_subj):
     print('... parse sumstats file: %s ...' % sst_file)
 
     ATGC = ['A', 'T', 'G', 'C']
-    sst_dict = {'SNP':[], 'A1':[], 'A2':[]}
-    with open(sst_file) as ff:
-        header = next(ff)
-        for line in ff:
-            ll = (line.strip()).split()
-            if ll[1] in ATGC and ll[2] in ATGC:
-                sst_dict['SNP'].append(ll[0])
-                sst_dict['A1'].append(ll[1])
-                sst_dict['A2'].append(ll[2])
-
-    print('... %d SNPs read from %s ...' % (len(sst_dict['SNP']), sst_file))
-
+    
+    sst_dict = pd.read_csv(sst_file, sep = "\t")
+    sst_dict = sst_dict[sst_dict.A1.isin(ATGC) & sst_dict.A2.isin(ATGC)]
 
     mapping = {'A': 'T', 'T': 'A', 'C': 'G', 'G': 'C'}
 
@@ -81,8 +47,7 @@ def parse_sumstats(ref_dict, vld_dict, sst_file, n_subj):
     comm_snp = vld_snp & ref_snp & sst_snp
 
     print('... %d common SNPs in the reference, sumstats, and validation set ...' % len(comm_snp))
-
-
+    
     n_sqrt = sp.sqrt(n_subj)
     sst_eff = {}
     with open(sst_file) as ff:
@@ -101,7 +66,7 @@ def parse_sumstats(ref_dict, vld_dict, sst_file, n_subj):
 
                 p = max(float(ll[4]), 1e-323)
                 beta_std = sp.sign(beta)*abs(norm.ppf(p/2.0))/n_sqrt
-                sst_eff.update({snp: beta_std})
+                sst_eff[snp] = beta_std
             elif (snp, a2, a1) in comm_snp or (snp, mapping[a2], mapping[a1]) in comm_snp:
                 if 'BETA' in header:
                     beta = float(ll[3])
@@ -110,10 +75,11 @@ def parse_sumstats(ref_dict, vld_dict, sst_file, n_subj):
 
                 p = max(float(ll[4]), 1e-323)
                 beta_std = -1*sp.sign(beta)*abs(norm.ppf(p/2.0))/n_sqrt
-                sst_eff.update({snp: beta_std})
+                sst_eff[snp] = beta_std
 
 
     sst_dict = {'CHR':[], 'SNP':[], 'BP':[], 'A1':[], 'A2':[], 'MAF':[], 'BETA':[], 'FLP':[]}
+    ref_dict.reset_index(inplace=True)
     for (ii, snp) in enumerate(ref_dict['SNP']):
         if snp in sst_eff:
             sst_dict['SNP'].append(snp)
@@ -143,7 +109,7 @@ def parse_sumstats(ref_dict, vld_dict, sst_file, n_subj):
                 sst_dict['MAF'].append(1-ref_dict['MAF'][ii])
                 sst_dict['FLP'].append(-1)
 
-    return sst_dict
+    return pd.DataFrame(sst_dict)
 
 
 def parse_ldblk(ldblk_dir, sst_dict, chrom):
@@ -167,14 +133,15 @@ def parse_ldblk(ldblk_dir, sst_dict, chrom):
     ld_blk_filt = []
     mm = 0
     for blk in range(n_blk):
-        idx = [ii for (ii, snp) in enumerate(snp_blk[blk]) if snp in sst_dict['SNP']]
-        
-        if len(idx) == 0: continue
+        idx = [ii for (ii, snp) in enumerate(snp_blk[blk]) if snp in sst_dict['SNP'].to_numpy() ]
+        #print(len(idx))
+        if len(idx) == 0: 
+            continue
         
         blk_size.append(len(idx))
         
-        idx_blk = range(mm,mm+len(idx))
-        flip = [sst_dict['FLP'][jj] for jj in idx_blk]
+        idx_blk = np.arange(mm,mm+len(idx))
+        flip = sst_dict['FLP'][idx_blk]
         ld_blk_here = ld_blk[blk][sp.ix_(idx,idx)]*sp.outer(flip,flip)
         ld_blk_filt.append(ld_blk_here)
         

@@ -189,25 +189,45 @@ param_dict = {
     'thin': 5
 }
 
+import importlib
+
+importlib.reload(parse_genet)
+
 if '1kg' in os.path.basename(param_dict['ref_dir']):
-    ref_dict = parse_genet.parse_ref(param_dict['ref_dir'] + '/snpinfo_1kg_hm3', int(chrom))
+    ref_df = parse_genet.parse_ref(param_dict['ref_dir'] + '/snpinfo_1kg_hm3')
 elif 'ukbb' in os.path.basename(param_dict['ref_dir']):
-    ref_dict = parse_genet.parse_ref(param_dict['ref_dir'] + '/snpinfo_ukbb_hm3', int(chrom))
+    ref_df = parse_genet.parse_ref(param_dict['ref_dir'] + '/snpinfo_ukbb_hm3')
+ref_df = ref_df[ref_df.CHR == chrom]
 
-vld_dict = parse_genet.parse_bim(param_dict['bim_prefix'], int(chrom))
+vld_df = parse_genet.parse_bim(param_dict['bim_prefix'] + ".bim")
+vld_df = vld_df[vld_df.CHR == chrom]
 
-sst_dict = parse_genet.parse_sumstats(ref_dict, vld_dict, param_dict['sst_file'], param_dict['n_gwas'])
+sst_dict = parse_genet.parse_sumstats(ref_df, vld_df, param_dict['sst_file'], param_dict['n_gwas'])
 
 ld_blk, ld_blk_sym, blk_size = parse_genet.parse_ldblk(param_dict['ref_dir'], sst_dict, chrom)
 
 #mcmc_gtb.mcmc(param_dict['a'], param_dict['b'], param_dict['phi'], sst_dict, param_dict['n_gwas'], ld_blk, blk_size, param_dict['n_iter'], param_dict['n_burnin'], param_dict['thin'], int(chrom), param_dict['out_dir'], param_dict['beta_std'], param_dict['seed'])
 
-import importlib
-importlib.reload(vi)
-importlib.reload(parse_genet)
 
 # collapsed converges in about 100 iterations (random init or zero init)
-losses = vi.vi(param_dict['phi'], sst_dict, param_dict['n_gwas'], ld_blk, blk_size, param_dict['n_iter'], chrom, param_dict['out_dir'], param_dict['beta_std'], param_dict['seed'], collapsed = False, structured_guide = True, eps = 1e-3, stall_window = 30, max_particles = 4)
+import numpy as np
+
+importlib.reload(vi)
+param_dict['out_dir'] = "collapsed"
+losses, beta, phi_est, sigma_est = vi.vi(None, sst_dict, param_dict['n_gwas'], ld_blk, blk_size, max_iterations = param_dict['n_iter'], collapsed = True, structured_guide = True, eps = 1e-2, max_particles=2, desired_min_eig = 1e-3)
+# convert standardized beta to per-allele beta
+if param_dict["beta_std"] == 'False':
+    beta /= np.sqrt(2.0*sst_dict['MAF']*(1.0-sst_dict['MAF']))
+    
+sst_dict["beta_shrunk"] = beta
+sst_dict.to_csv
+
+
+param_dict['out_dir'] = "uncollapsed"
+losses, beta = vi.vi(param_dict['phi'], sst_dict, param_dict['n_gwas'], ld_blk, blk_size, param_dict['n_iter'], param_dict['out_dir'], param_dict['beta_std'], param_dict['seed'], collapsed = False, structured_guide = False, eps = 1e-3)
+
+param_dict['out_dir'] = "uncollapsed_structured"
+losses, beta = vi.vi(param_dict['phi'], sst_dict, param_dict['n_gwas'], ld_blk, blk_size, param_dict['n_iter'], param_dict['out_dir'], param_dict['beta_std'], param_dict['seed'], collapsed = False, structured_guide = True, eps = 1e-3)
 
 # estimated phi=0.017, seems reasonable? 
 
@@ -215,3 +235,17 @@ plt.plot(losses)
 
 # -1813 with collapsed model.
 # 1066797075 with uncollapsed! 
+
+
+import pandas as pd
+import matplotlib.pyplot as plt
+
+a = pd.read_csv("collapsed_pst_eff_phi0.4381928641988999_chr22.txt", sep = "\t", names = ["chrom","rsid","pos","ref","alt","beta"])
+b = pd.read_csv("uncollapsed_pst_eff_phi0.05207817962551986_chr22.txt", sep = "\t", names = ["chrom","rsid","pos","ref","alt","beta"])
+c = pd.read_csv("uncollapsed_structured_pst_eff_phi0.05753101022186535_chr22.txt", sep = "\t", names = ["chrom","rsid","pos","ref","alt","beta"])
+
+# none of these agree v well
+plt.scatter(b.beta, c.beta)
+
+
+
