@@ -211,10 +211,38 @@ ld_blk, ld_blk_sym, blk_size = parse_genet.parse_ldblk(param_dict['ref_dir'], ss
 
 # collapsed converges in about 100 iterations (random init or zero init)
 import numpy as np
+import pyro.distributions as dist
+import torch
+sigma_over_sqrt_n = 1. / torch.sqrt(torch.tensor(param_dict['n_gwas']))
+p = len(sst_dict)
+beta_true = torch.where(torch.rand(p) < 0.2, 0.1 * torch.randn(p), torch.zeros(p))
+
+beta_mrg = torch.zeros(p)
+mm = 0
+for kk in range(len(ld_blk)):
+    idx_blk = torch.arange(mm,mm+blk_size[kk])
+    ld_torch = torch.tensor(ld_blk[kk], dtype = torch.float)
+    L, V = torch.linalg.eigh(ld_torch)
+    L[L < 0.] = 0.
+    
+    beta_mrg[idx_blk] = ld_torch @ beta_true[idx_blk] + sigma_over_sqrt_n * (V @ torch.diag(L.sqrt())) @ torch.randn(blk_size[kk])
+    #ld_torch @ beta_true[idx_blk], 
+    # covariance_matrix = ld_torch * sigma_over_sqrt_n**2).rsample()
+    mm += blk_size[kk]
+    
+sst_dict["BETA"] = beta_mrg
 
 importlib.reload(vi)
 param_dict['out_dir'] = "collapsed"
-losses, beta, phi_est, sigma_est = vi.vi(None, sst_dict, param_dict['n_gwas'], ld_blk, blk_size, max_iterations = param_dict['n_iter'], collapsed = True, structured_guide = True, eps = 1e-2, max_particles=2, desired_min_eig = 1e-3)
+losses, beta, phi_est, sigma_est = vi.vi(None, sst_dict, param_dict['n_gwas'], ld_blk, blk_size, max_iterations = param_dict['n_iter'], collapsed = False, structured_guide = True, eps = 1e-2, max_particles=8, desired_min_eig = 1e-3, lr = 0.0003)
+
+plt.plot(losses); plt.show()
+
+import matplotlib.pyplot as plt
+plt.scatter(beta_true, beta)
+plt.xlabel("True beta")
+plt.ylabel("Infered beta")
+
 # convert standardized beta to per-allele beta
 if param_dict["beta_std"] == 'False':
     beta /= np.sqrt(2.0*sst_dict['MAF']*(1.0-sst_dict['MAF']))

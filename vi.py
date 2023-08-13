@@ -54,7 +54,8 @@ def get_posterior_stats(
             phi = samples["sqrt_phi"][i]**2 if (phi_known is None) else phi_known
             psi = samples["sqrt_psi"][i]**2
             sigma2_noise = samples["sigma_noise"][i]**2
-            v = phi * psi * sigma2_noise / data.n
+            #v = phi * psi * sigma2_noise / data.n # TODO
+            v = psi * sigma2_noise / data.n
 
             #sigma2 = samples["sigma_noise"][i]**2
             mm = 0
@@ -94,10 +95,10 @@ def model_uncollapsed(data, sqrt_phi = dist.HalfCauchy(1.), desired_min_eig = 1e
     
     sqrt_phi = convertr(sqrt_phi, "sqrt_phi", device = device)
     
-    sqrt_psi = pyro.sample(
-        "sqrt_psi",
-         dist.HalfCauchy(1.).expand([data.p]).to_event(1) # PRSCS uses Strawderman-Berger here which is slightly different
-    )
+    #sqrt_psi = pyro.sample(
+    #    "sqrt_psi",
+    #     dist.HalfCauchy(sqrt_phi).expand([data.p]).to_event(1) # PRSCS uses Strawderman-Berger here which is slightly different
+    #)
 
     sigma_noise = pyro.sample(
         "sigma_noise", 
@@ -109,20 +110,20 @@ def model_uncollapsed(data, sqrt_phi = dist.HalfCauchy(1.), desired_min_eig = 1e
     beta_global_scale = sqrt_phi * sigma_over_sqrt_n
     
     mm = 0
-    for kk in range(len(blk_size)):
+    for kk in range(len(data.blk_size)):
         assert(data.blk_size[kk] > 0)
         
         idx_blk = torch.arange(mm,mm+data.blk_size[kk])
 
         beta = pyro.sample(
             "beta_%i" % kk, 
-            dist.Normal(0., beta_global_scale * sqrt_psi[idx_blk]).to_event(1) # already uses scale conveniently
+            dist.Laplace(0., beta_global_scale).expand([data.blk_size[kk]]).to_event(1) # *sqrt_psi[idx_blk] # already uses scale conveniently
         )
         
         obs = pyro.sample(
             "obs_%i" % kk, 
             dist.MultivariateNormal(
-                ld_blk[kk] @ beta, 
+                data.ld_blk[kk] @ beta, 
                 scale_tril = sigma_over_sqrt_n * data.ld_blk_chol[kk], 
             ), 
             obs = data.beta_mrg[idx_blk])
@@ -134,15 +135,18 @@ def model_collapsed(data, sqrt_phi = dist.HalfCauchy(1.), desired_min_eig = 1e-6
     device = data.beta_mrg.device
     
     sqrt_phi = convertr(sqrt_phi, "sqrt_phi", device = device)
-    phi = sqrt_phi**2
+    #phi = sqrt_phi**2
     
     sqrt_psi = pyro.sample( # constrain < 1? 
         "sqrt_psi",
-         dist.HalfCauchy(1.).expand([data.p]).to_event(1) # PRSCS uses Strawderman-Berger here which is slightly different
+         dist.HalfCauchy(sqrt_phi).expand([data.p]).to_event(1) # PRSCS uses Strawderman-Berger here which is slightly different
     )
     psi = sqrt_psi**2
     
-    v = psi * phi
+    v = psi
+    #v = psi * phi
+    
+    initial_trace_flag = (v > 1).any().item() # hack. better way to do this? 
             
     sigma_noise = pyro.sample(
         "sigma_noise", 
@@ -163,16 +167,19 @@ def model_collapsed(data, sqrt_phi = dist.HalfCauchy(1.), desired_min_eig = 1e-6
         cov = (data.ld_blk[kk] * v[idx_blk]) @ data.ld_blk[kk] + data.ld_blk[kk] 
         cov = 0.5 * (cov + cov.T) # isn't _quite_ symmetric otherwise
         
-        try: # faster than the eigendecomposition if already PSD
-            chol_cov = torch.linalg.cholesky(cov)
-        except torch._C._LinAlgError: 
-            L, V = torch.linalg.eigh(cov)
-            cov_min_eig = L.min().item()
-            if cov_min_eig < desired_min_eig: 
-                print("Degenerate cov (min eigenvalue=%1.3e)" % cov_min_eig)
-                # smallest addition to diagonal to make min(eig) = min_eig
-                cov += (desired_min_eig - cov_min_eig) * torch.eye(data.blk_size[kk])
-            chol_cov = torch.linalg.cholesky(cov)
+        if initial_trace_flag: 
+            chol_cov = torch.eye(data.blk_size[kk])
+        else: 
+            try: # faster than the eigendecomposition if already PSD
+                chol_cov = torch.linalg.cholesky(cov)
+            except torch._C._LinAlgError: 
+                L, V = torch.linalg.eigh(cov)
+                cov_min_eig = L.min().item()
+                if cov_min_eig < desired_min_eig: 
+                    print("Degenerate cov (min eigenvalue=%1.3e)" % cov_min_eig)
+                    # smallest addition to diagonal to make min(eig) = min_eig
+                    cov += (desired_min_eig - cov_min_eig) * torch.eye(data.blk_size[kk])
+                chol_cov = torch.linalg.cholesky(cov)
         #if cov.logdet().item() == -np.inf: 
             #print("Degenerate covariance, adding to diagonal")
         #    cov += 1e-2 * torch.eye(data.blk_size[kk])
@@ -197,6 +204,18 @@ def psi_guide(data):
     
     sqrt_psi = pyro.sample("sqrt_psi", dist.TransformedDistribution(base_dist, SigmoidTransform()))
     
+def beta_guide(data): 
+    
+    for which_block in range(len(data.ld_blk)):
+        beta_loc = pyro.param("beta_loc_%i" % which_block, torch.zeros([data.blk_size[which_block]]))
+        beta_ld_scale = pyro.param("beta_ld_%i" % which_block, torch.full_like(beta_loc, 10.), constraint = constraints.positive)
+        beta_scale = pyro.param("beta_scale_%i" % which_block, torch.full_like(beta_loc, 0.1), constraint = constraints.positive)
+
+        beta = pyro.sample("beta_%i" % which_block, dist.MultivariateNormal(
+            beta_loc, 
+            precision_matrix = beta_ld_scale[:,None] * data.ld_blk[which_block] * beta_ld_scale + torch.diag(1./beta_scale)))
+
+
 def my_optimizer(model, guide, data, end = "\r", print_every = 10, min_iterations = 100, max_iterations = 1000, max_particles = 32, stall_window = 10, use_renyi = False, lr = 0.03):
     
     adam = pyro.optim.Adam({"lr": lr})
@@ -257,7 +276,7 @@ def vi(
     seed = 42, 
     eps = 1e-4, 
     collapsed = True, 
-    structured_guide = True, 
+    beta_guide_type = "DiagonalNormal", # alternative: MultivariteNormal, LDbased
     constrain_psi = True, 
     desired_min_eig = 1e-8, 
     **opt_kwargs
@@ -306,12 +325,15 @@ def vi(
         init_loc_fn = init_to_value(values={"sqrt_psi" : torch.sqrt(torch.full([p],0.1))})))
     
     if not collapsed: 
-        guide_func = AutoMultivariateNormal if structured_guide else AutoDiagonalNormal
-        for kk in range(n_blk):
-            beta_name = "beta_%i" % kk
-            guide.add(AutoMultivariateNormal( 
-                poutine.block(model, expose = [beta_name]), 
-                init_loc_fn = init_to_value(values={ beta_name : torch.zeros(blk_size[kk]) })))
+        if beta_guide_type == "LDbased": 
+            guide.add(beta_guide)
+        else: 
+            guide_func = AutoMultivariateNormal if (beta_guide_type == "MultivariateNormal") else AutoDiagonalNormal
+            for kk in range(n_blk):        
+                beta_name = "beta_%i" % kk
+                guide.add(guide_func( 
+                    poutine.block(model, expose = [beta_name]), 
+                    init_loc_fn = init_to_value(values={ beta_name : torch.zeros(blk_size[kk]) })))
                 
     losses = my_optimizer(model, guide, data, **opt_kwargs)
                     
