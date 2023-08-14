@@ -191,7 +191,7 @@ param_dict = {
 
 import importlib
 
-importlib.reload(parse_genet)
+#importlib.reload(simulate)
 
 if '1kg' in os.path.basename(param_dict['ref_dir']):
     ref_df = parse_genet.parse_ref(param_dict['ref_dir'] + '/snpinfo_1kg_hm3')
@@ -210,38 +210,26 @@ ld_blk, ld_blk_sym, blk_size = parse_genet.parse_ldblk(param_dict['ref_dir'], ss
 
 
 # collapsed converges in about 100 iterations (random init or zero init)
-import numpy as np
-import pyro.distributions as dist
-import torch
-sigma_over_sqrt_n = 1. / torch.sqrt(torch.tensor(param_dict['n_gwas']))
-p = len(sst_dict)
-beta_true = torch.where(torch.rand(p) < 0.2, 0.1 * torch.randn(p), torch.zeros(p))
+import simulate
+beta_true, beta_mrg, annotations = simulate.simulate_sumstats(ld_blk, blk_size, param_dict['n_gwas'], p = len(sst_dict))
 
-beta_mrg = torch.zeros(p)
-mm = 0
-for kk in range(len(ld_blk)):
-    idx_blk = torch.arange(mm,mm+blk_size[kk])
-    ld_torch = torch.tensor(ld_blk[kk], dtype = torch.float)
-    L, V = torch.linalg.eigh(ld_torch)
-    L[L < 0.] = 0.
-    
-    beta_mrg[idx_blk] = ld_torch @ beta_true[idx_blk] + sigma_over_sqrt_n * (V @ torch.diag(L.sqrt())) @ torch.randn(blk_size[kk])
-    #ld_torch @ beta_true[idx_blk], 
-    # covariance_matrix = ld_torch * sigma_over_sqrt_n**2).rsample()
-    mm += blk_size[kk]
-    
-sst_dict["BETA"] = beta_mrg
+# min_iterations = 100, max_iterations = 1000, min_particles = 1, max_particles = 32, stall_window = 10, use_renyi = False, lr = 0.03
+import torch
+device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 importlib.reload(vi)
 param_dict['out_dir'] = "collapsed"
-losses, beta, phi_est, sigma_est = vi.vi(None, sst_dict, param_dict['n_gwas'], ld_blk, blk_size, max_iterations = param_dict['n_iter'], collapsed = False, structured_guide = True, eps = 1e-2, max_particles=8, desired_min_eig = 1e-3, lr = 0.0003)
+losses, beta, phi_est, sigma_est, stats = vi.vi(sst_dict, param_dict['n_gwas'], ld_blk, blk_size, device = device, annotations = annotations, max_iterations = param_dict['n_iter'], collapsed = True, min_particles = 5, max_particles=5, desired_min_eig = 1e-3, min_iterations = 1000, phi_as_prior = False, lr = 0.03)
 
-plt.plot(losses); plt.show()
+plt.plot(losses[:500]); plt.show()
 
 import matplotlib.pyplot as plt
 plt.scatter(beta_true, beta)
 plt.xlabel("True beta")
 plt.ylabel("Infered beta")
+
+stats["annotation_weights"]["mean"]
+stats["annotation_weights"]
 
 # convert standardized beta to per-allele beta
 if param_dict["beta_std"] == 'False':
