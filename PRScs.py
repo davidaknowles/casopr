@@ -166,7 +166,7 @@ def main():
         vi.vi(param_dict['phi'], sst_dict, param_dict['n_gwas'], ld_blk, blk_size, 
             param_dict['n_iter'], int(chrom), param_dict['out_dir'], param_dict['beta_std'], param_dict['seed'])
         
-        losses, beta, phi_est, stats = vi.vi(sst_dict, param_dict['n_gwas'], ld_blk, blk_size, device = device, annotations = None, max_iterations = param_dict['n_iter'], collapsed = True, min_particles = 1, max_particles=4, desired_min_eig = 1e-3, min_iterations = 200, stall_window = 30, phi_as_prior = False, lr = 0.03, constrain_sigma = True)
+        losses, beta, phi_est, stats = vi.vi(sst_dict, param_dict['n_gwas'], ld_blk, blk_size, device = device, annotations = None, max_iterations = param_dict['n_iter'], min_particles = 1, max_particles=4, desired_min_eig = 1e-3, min_iterations = 200, stall_window = 30, phi_as_prior = False, lr = 0.03, constrain_sigma = True)
 
         if param_dict["beta_std"] == 'False':
             beta /= np.sqrt(2.0*sst_dict['MAF']*(1.0-sst_dict['MAF']))

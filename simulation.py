@@ -23,13 +23,11 @@ param_dict = {
     'bim_prefix' : "test_data/test", 
     'sst_file' : "test_data/sumstats.txt", 
     'n_gwas' : 200000, 
-    'phi' : 1e-2, 
     'out_dir' : "test_data",
     "seed" : 42, 
     "beta_std" : "False", 
     "n_iter" : 1000
 }
-
 
 if '1kg' in os.path.basename(param_dict['ref_dir']):
     ref_df = parse_genet.parse_ref(param_dict['ref_dir'] + '/snpinfo_1kg_hm3')
@@ -53,10 +51,14 @@ sst_dict["BETA"] = beta_mrg
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 importlib.reload(vi)
-param_dict['out_dir'] = "collapsed"
 one = torch.tensor(1., device=device)
-losses, beta, phi_est, stats = vi.vi(sst_dict, param_dict['n_gwas'], ld_blk, blk_size, device = device, annotations = annotations, max_iterations = param_dict['n_iter'], collapsed = False, beta_guide_type = "LDbased", min_particles = 1, max_particles=4, desired_min_eig = 1e-3, min_iterations = 200, stall_window = 30, phi_as_prior = False, lr = 0.03, constrain_sigma = True)
+losses, beta, phi_est, stats = vi.vi(sst_dict, param_dict['n_gwas'], ld_blk, blk_size, device = device, annotations = annotations, max_iterations = param_dict['n_iter'], max_particles=4, desired_min_eig = 1e-3, min_iterations = 200, stall_window = 30, phi_as_prior = False, lr = 0.03, constrain_sigma = True)
 
+# observations: 
+# collapsed >> uncollapsed (deleted uncollapsed code)
+# phi_as_prior = False seems to give better results, but phi_as_prior = True gives more robust training (less noisy loss), probably because constraint on psi is more useful. 
+# Does constrain_sigma help? I think constrain_psi does. 
+# Seem to need desired_min_eig=1e-3 at least to avoid numerical issues. Could go lower if using float64 it seemed. 
 
 plt.plot(losses); plt.show()
 
