@@ -195,7 +195,7 @@ def beta_guide(data):
             precision_matrix = beta_ld_scale[:,None] * data.ld_blk[which_block] * beta_ld_scale + torch.diag(1./beta_scale)))
 
 
-def my_optimizer(model, guide, data, end = "\r", print_every = 10, min_iterations = 200, max_iterations = 1000, min_particles = 1, max_particles = 16, stall_window = 30, use_renyi = False, lr = 0.03):
+def my_optimizer(model, guide, data, end = "\r", print_every = 10, min_iterations = 200, max_iterations = 1000, min_particles = 1, max_particles = 8, stall_window = 30, use_renyi = False, lr = 0.03):
     """
     Perform stochastic optimization
 

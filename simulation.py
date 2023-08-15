@@ -65,12 +65,9 @@ plt.plot(losses); plt.show()
 plt.scatter(beta_true, beta)
 plt.xlabel("True beta")
 plt.ylabel("Infered beta")
+plt.title("Pearson R=%1.3f" % scipy.stats.pearsonr(beta_true,beta)[0] )
 
-stats["sigma_noise"]
-
-print(scipy.stats.pearsonr(beta_true,beta)[0]) # 0.808. Same with and without annotations? 717
-
-stats["annotation_weights"]
+stats["annotation_weights"] # ideally should show large positive value for second entry, and close to 0 for third (noise)
 
 # convert standardized beta to per-allele beta
 if param_dict["beta_std"] == 'False':
