@@ -334,7 +334,7 @@ def vi(
     one = torch.tensor(1., **torch_type)
     sqrt_phi = dist.HalfCauchy(one) if (phi is None) else np.sqrt(phi).to(**torch_type)
     
-    sigma_noise = dist.Gamma(2. * one, 2. * one) if (sigma_noise is None) else sigma_noise # dist.HalfCauchy(one)
+    sigma_noise = dist.HalfCauchy(one) if (sigma_noise is None) else sigma_noise # dist.Gamma(2. * one, 2. * one), dist.InverseGamma(0.001 * one, 0.001 * one)
     
     model = lambda dat: model_collapsed(dat, sigma_noise = sigma_noise, phi_as_prior = phi_as_prior, sqrt_phi = sqrt_phi, desired_min_eig = desired_min_eig)    
     
