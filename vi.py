@@ -57,13 +57,11 @@ def get_posterior_stats(
             if data.annotations is None: 
                 phi = samples["sqrt_phi"][i]**2 if (phi_known is None) else phi_known
             else: 
-                sqrt_phi = data.annotations @ samples["annotation_weights"][i]
+                sqrt_phi = torch.nn.functional.softplus(data.annotations @ samples["annotation_weights"][i])
                 phi = sqrt_phi**2
             psi = samples["sqrt_psi"][i]**2
-            sigma2_noise = samples["sigma_noise"][i]**2
-            v = (psi if phi_as_prior else psi*psi) * sigma2_noise / data.n
+            v = psi if phi_as_prior else psi*psi
 
-            #sigma2 = samples["sigma_noise"][i]**2
             mm = 0
             for kk in range(len(data.ld_blk)):
                 idx_blk = torch.arange(mm,mm+data.blk_size[kk])
@@ -92,53 +90,8 @@ def convertr(hyperparam, name, device):
     return torch.tensor(hyperparam, device = device) if (
         type(hyperparam) in [float,np.float32,torch.float]
     ) else pyro.sample(name, hyperparam)
-        
-def model_uncollapsed(data, sqrt_phi = dist.HalfCauchy(1.), desired_min_eig = 1e-6): 
-    
-    device = data.beta_mrg.device
-        
-    zero = torch.tensor(0., **data.torch_type)
-    one = torch.tensor(1., **data.torch_type)
-    
-    n_blk = len(data.ld_blk)
-    
-    sqrt_phi = convertr(sqrt_phi, "sqrt_phi", device = device)
-    
-    sqrt_psi = pyro.sample(
-        "sqrt_psi",
-         dist.HalfCauchy(sqrt_phi).expand([data.p]).to_event(1) # PRSCS uses Strawderman-Berger here which is slightly different
-    )
 
-    sigma_noise = pyro.sample(
-        "sigma_noise", 
-        dist.HalfCauchy(one) # try Jeffery's instead? Think this would be Gamma(eps,rate=eps). 
-    )
-    
-    torch_n = torch.tensor(data.n, **data.torch_type)
-    sigma_over_sqrt_n = sigma_noise / torch.sqrt(torch_n)
-    
-    mm = 0
-    for kk in range(len(data.blk_size)):
-        assert(data.blk_size[kk] > 0)
-        
-        idx_blk = torch.arange(mm,mm+data.blk_size[kk])
-
-        beta = pyro.sample(
-            "beta_%i" % kk, 
-            dist.Normal(zero, sigma_over_sqrt_n * sqrt_psi[idx_blk]).to_event(1) # *sqrt_psi[idx_blk] # already uses scale conveniently
-        )
-        
-        obs = pyro.sample(
-            "obs_%i" % kk, 
-            dist.MultivariateNormal(
-                data.ld_blk[kk] @ beta, 
-                scale_tril = sigma_over_sqrt_n * data.ld_blk_chol[kk], 
-            ), 
-            obs = data.beta_mrg[idx_blk])
-        
-        mm += data.blk_size[kk]
-
-def model_collapsed(data, phi_as_prior = True, sqrt_phi = dist.HalfCauchy(1.), desired_min_eig = 1e-6): 
+def model_uncollapsed(data, sigma_noise = 1., phi_as_prior = True, sqrt_phi = dist.HalfCauchy(1.), desired_min_eig = 1e-6): 
     
     device = data.beta_mrg.device
     
@@ -156,7 +109,62 @@ def model_collapsed(data, phi_as_prior = True, sqrt_phi = dist.HalfCauchy(1.), d
         
         sqrt_psi = pyro.sample( # constrain < 1? 
             "sqrt_psi",
-             dist.HalfCauchy(sqrt_phi if phi_as_prior else torch.ones(data.p, device=device)).to_event(1) 
+             dist.HalfCauchy(sqrt_phi if phi_as_prior else torch.ones(data.p, **data.torch_type)).to_event(1) 
+        )
+    else: 
+        sqrt_phi = convertr(sqrt_phi, "sqrt_phi", device = device)
+        sqrt_psi = pyro.sample( # constrain < 1? 
+            "sqrt_psi",
+             dist.HalfCauchy(sqrt_phi if phi_as_prior else one).expand([data.p]).to_event(1)) # PRSCS uses Strawderman-Berger here
+    
+    beta_scale = sqrt_psi if phi_as_prior else sqrt_phi*sqrt_psi
+    
+    sigma_noise = convertr(sigma_noise, "sigma_noise", device = device)
+    sigma2_noise = sigma_noise**2
+    
+    torch_n = torch.tensor(data.n, **data.torch_type)
+    sigma_over_sqrt_n = sigma_noise / torch.sqrt(torch_n)
+    
+    mm = 0
+    for kk in range(len(data.blk_size)):
+        assert(data.blk_size[kk] > 0)
+        
+        idx_blk = torch.arange(mm,mm+data.blk_size[kk])
+
+        beta = pyro.sample(
+            "beta_%i" % kk, 
+            dist.Normal(zero, sigma_over_sqrt_n * beta_scale[idx_blk]).to_event(1) # *sqrt_psi[idx_blk] # already uses scale conveniently
+        )
+        
+        obs = pyro.sample(
+            "obs_%i" % kk, 
+            dist.MultivariateNormal(
+                data.ld_blk[kk] @ beta, 
+                scale_tril = sigma_over_sqrt_n * data.ld_blk_chol[kk], 
+            ), 
+            obs = data.beta_mrg[idx_blk])
+        
+        mm += data.blk_size[kk]
+
+def model_collapsed(data, sigma_noise = 1., phi_as_prior = True, sqrt_phi = dist.HalfCauchy(1.), desired_min_eig = 1e-6): 
+    
+    device = data.beta_mrg.device
+    
+    zero = torch.tensor(0., **data.torch_type)
+    one = torch.tensor(1., **data.torch_type)
+    
+    if not data.annotations is None:
+        n_annotations = data.annotations.shape[1] 
+        annotation_weights = pyro.sample(
+            "annotation_weights",
+            dist.Normal(zero, one).expand([n_annotations]).to_event(1) 
+        )
+
+        sqrt_phi = torch.nn.functional.softplus(data.annotations @ annotation_weights) # or exp?
+        
+        sqrt_psi = pyro.sample( # constrain < 1? 
+            "sqrt_psi",
+             dist.HalfCauchy(sqrt_phi if phi_as_prior else torch.ones(data.p, **data.torch_type)).to_event(1) 
         )
     else: 
         sqrt_phi = convertr(sqrt_phi, "sqrt_phi", device = device)
@@ -171,11 +179,10 @@ def model_collapsed(data, phi_as_prior = True, sqrt_phi = dist.HalfCauchy(1.), d
     
     initial_trace_flag = (v > 1).any().item() # hack. better way to do this? 
             
-    sigma_noise = pyro.sample(
-        "sigma_noise", 
-        dist.HalfCauchy(1.) # try Jeffery's instead
-    )
+    sigma_noise = convertr(sigma_noise, "sigma_noise", device = device)
     sigma2_noise = sigma_noise**2
+    #sigma2_noise = pyro.sample("sigma_noise", dist.InverseGamma(one * 0.01, one * 0.01))
+    #sigma_noise = sigma2_noise.sqrt()
     
     torch_n = torch.tensor(data.n, **data.torch_type)
     sigma_over_sqrt_n = sigma_noise / torch.sqrt(torch_n)
@@ -228,6 +235,15 @@ def psi_guide(data):
     
     sqrt_psi = pyro.sample("sqrt_psi", dist.TransformedDistribution(base_dist, SigmoidTransform()))
     
+def sigma_guide(data):
+    
+    logit_sigma_loc = pyro.param("logit_sigma_loc", torch.tensor(0., **data.torch_type))
+    logit_sigma_scale = pyro.param("logit_sigma_scale", torch.tensor(0.1, **data.torch_type), constraint = constraints.positive)
+    
+    base_dist = dist.Normal(logit_sigma_loc, logit_sigma_scale)
+    
+    sigma_noise = pyro.sample("sigma_noise", dist.TransformedDistribution(base_dist, SigmoidTransform()))
+    
 def beta_guide(data): 
     
     for which_block in range(len(data.ld_blk)):
@@ -240,7 +256,7 @@ def beta_guide(data):
             precision_matrix = beta_ld_scale[:,None] * data.ld_blk[which_block] * beta_ld_scale + torch.diag(1./beta_scale)))
 
 
-def my_optimizer(model, guide, data, end = "\r", print_every = 10, min_iterations = 100, max_iterations = 1000, min_particles = 1, max_particles = 32, stall_window = 10, use_renyi = False, lr = 0.03):
+def my_optimizer(model, guide, data, end = "\r", print_every = 10, min_iterations = 200, max_iterations = 1000, min_particles = 1, max_particles = 16, stall_window = 30, use_renyi = False, lr = 0.03):
     
     adam = pyro.optim.Adam({"lr": lr})
 
@@ -298,13 +314,13 @@ def vi(
     blk_size, 
     device = "cpu",
     annotations = None,
+    sigma_noise = None, 
     phi = None, 
     phi_as_prior = True,
-    n_iter = 1000, 
-    seed = 42, 
     collapsed = True, 
-    beta_guide_type = "DiagonalNormal", # alternative: MultivariteNormal, LDbased
+    beta_guide_type = "DiagonalNormal", # alternative: MultivariateNormal, LDbased
     constrain_psi = True, 
+    constrain_sigma = False,
     desired_min_eig = 1e-8, 
     **opt_kwargs
 ):
@@ -327,30 +343,42 @@ def vi(
         ld_blk = ld_fix, 
         ld_blk_chol = ld_blk_chol,
         blk_size = blk_size,
-        annotations = annotations.to(device), 
+        annotations = None if (annotations is None) else annotations.to(device), 
         torch_type = torch_type
     )
     
     n_blk = len(ld_blk) # number of LD blocks
     
     #print( Trace_ELBO()(model_uncollapsed, guide)(beta_mrg, n, p, ld_blk, ld_blk_chol, blk_size) )
-    sqrt_phi = dist.HalfCauchy(1.) if (phi is None) else np.sqrt(phi).astype("float32")
+    one = torch.tensor(1., **torch_type)
+    sqrt_phi = dist.HalfCauchy(one) if (phi is None) else np.sqrt(phi).to(**torch_type)
+    
+    sigma_noise = dist.Gamma(2. * one, 2. * one) if (sigma_noise is None) else sigma_noise # dist.HalfCauchy(one)
     
     model_ = model_collapsed if collapsed else model_uncollapsed
-    model = lambda dat: model_(dat, phi_as_prior = phi_as_prior, sqrt_phi = sqrt_phi, desired_min_eig = desired_min_eig)    
+    model = lambda dat: model_(dat, sigma_noise = sigma_noise, phi_as_prior = phi_as_prior, sqrt_phi = sqrt_phi, desired_min_eig = desired_min_eig)    
     
     guide = AutoGuideList(model)
     
-    to_expose = ["sigma_noise"] + (["sqrt_phi"] if (annotations is None) else ["annotation_weights"])
-    #print(to_expose)
-    guide.add(AutoDiagonalNormal(
-        poutine.block(
-            model,
-            expose = to_expose), # or could optimize these? 
-        init_loc_fn = init_to_value(values={
-            "sqrt_phi" : torch.sqrt(torch.tensor(0.01, **torch_type)),
-            "sigma_noise" : torch.sqrt(torch.tensor(0.5, **torch_type))
-        })))
+    to_expose = []
+    if not (annotations is None): to_expose.append("annotation_weights")
+    if phi is None: to_expose.append("sqrt_phi")
+    
+    if len(to_expose) > 0: 
+        guide.add(AutoDiagonalNormal(
+            poutine.block(
+                model,
+                expose = to_expose), # or could optimize these? 
+            init_loc_fn = init_to_value(values={
+                "sqrt_phi" : torch.sqrt(torch.tensor(0.01, **torch_type))
+            })))
+        
+    if (type(sigma_noise) != float):
+        guide.add(sigma_guide if constrain_sigma else AutoDiagonalNormal(
+            poutine.block(
+                model,
+                expose = ["sigma_noise"]),
+            init_loc_fn = init_to_value(values={"sigma_noise" : one})))    
     
     guide.add(psi_guide if constrain_psi else AutoDiagonalNormal(
         poutine.block(
@@ -368,17 +396,15 @@ def vi(
                 guide.add(guide_func( 
                     poutine.block(model, expose = [beta_name]), 
                     init_loc_fn = init_to_value(values={ beta_name : torch.zeros(blk_size[kk],**torch_type) })))
-                
+    
     losses = my_optimizer(model, guide, data, **opt_kwargs)
                     
     stats = get_posterior_stats(model, guide, data, phi, phi_as_prior = phi_as_prior, collapsed = collapsed)
     beta_est = stats["beta"]["mean"].squeeze().cpu().numpy()
     if data.annotations is None: 
-        phi_est = stats["sqrt_phi"]["mean"]**2 if (phi_known is None) else phi_known
+        phi_est = stats["sqrt_phi"]["mean"]**2 if (phi is None) else phi
     else: 
         sqrt_phi = data.annotations @ stats["annotation_weights"]["mean"]
         phi_est = sqrt_phi**2
 
-    print("Estimated noise std=%1.2e" % stats["sigma_noise"]["mean"])
-
-    return losses, beta_est, phi_est, stats["sigma_noise"]["mean"].item(), stats
+    return losses, beta_est, phi_est, stats

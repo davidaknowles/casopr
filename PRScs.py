@@ -68,7 +68,6 @@ python PRScs.py --ref_dir=PATH_TO_REFERENCE --bim_prefix=VALIDATION_BIM_PREFIX -
 
 """
 
-
 import os
 import sys
 import getopt
@@ -78,6 +77,9 @@ import mcmc_gtb
 import gigrnd
 import vi
 
+import torch
+
+device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 def parse_param():
     long_opts_list = ['ref_dir=', 'bim_prefix=', 'sst_file=', 'a=', 'b=', 'phi=', 'n_gwas=',
@@ -148,120 +150,28 @@ def main():
         print('##### process chromosome %d #####' % int(chrom))
 
         if '1kg' in os.path.basename(param_dict['ref_dir']):
-            ref_dict = parse_genet.parse_ref(param_dict['ref_dir'] + '/snpinfo_1kg_hm3', int(chrom))
+            ref_df = parse_genet.parse_ref(param_dict['ref_dir'] + '/snpinfo_1kg_hm3')
         elif 'ukbb' in os.path.basename(param_dict['ref_dir']):
-            ref_dict = parse_genet.parse_ref(param_dict['ref_dir'] + '/snpinfo_ukbb_hm3', int(chrom))
+            ref_df = parse_genet.parse_ref(param_dict['ref_dir'] + '/snpinfo_ukbb_hm3')
+        ref_df = ref_df[ref_df.CHR == chrom]
 
-        vld_dict = parse_genet.parse_bim(param_dict['bim_prefix'], int(chrom))
+        vld_df = parse_genet.parse_bim(param_dict['bim_prefix'] + ".bim")
+        vld_df = vld_df[vld_df.CHR == chrom]
 
-        sst_dict = parse_genet.parse_sumstats(ref_dict, vld_dict, param_dict['sst_file'], param_dict['n_gwas'])
+        sst_dict = parse_genet.parse_sumstats(ref_df, vld_df, param_dict['sst_file'], param_dict['n_gwas'])
 
-        ld_blk, blk_size = parse_genet.parse_ldblk(param_dict['ref_dir'], sst_dict, int(chrom))
+        ld_blk, ld_blk_sym, blk_size = parse_genet.parse_ldblk(param_dict['ref_dir'], sst_dict, chrom)
 
-        #mcmc_gtb.mcmc(param_dict['a'], param_dict['b'], param_dict['phi'], sst_dict, param_dict['n_gwas'], ld_blk, blk_size,
-        #    param_dict['n_iter'], param_dict['n_burnin'], param_dict['thin'], int(chrom), param_dict['out_dir'], param_dict['beta_std'], param_dict['seed'])
-
+        
         vi.vi(param_dict['phi'], sst_dict, param_dict['n_gwas'], ld_blk, blk_size, 
             param_dict['n_iter'], int(chrom), param_dict['out_dir'], param_dict['beta_std'], param_dict['seed'])
         
+        losses, beta, phi_est, stats = vi.vi(sst_dict, param_dict['n_gwas'], ld_blk, blk_size, device = device, annotations = None, max_iterations = param_dict['n_iter'], collapsed = True, min_particles = 1, max_particles=4, desired_min_eig = 1e-3, min_iterations = 200, stall_window = 30, phi_as_prior = False, lr = 0.03, constrain_sigma = True)
+
+        if param_dict["beta_std"] == 'False':
+            beta /= np.sqrt(2.0*sst_dict['MAF']*(1.0-sst_dict['MAF']))
+
+        sst_dict["beta_shrunk"] = beta
+        sst_dict.to_csv(param_dict['out_dir'] + "_chrom%s" % chrom, sep = "\t")
+
         print('\n')
-
-
-if __name__ == '__main__':
-    main()
-
-
-chrom = 22
-
-param_dict = {
-    'ref_dir' : "../ld/ldblk_1kg_eur", 
-    'bim_prefix' : "test_data/test", 
-    'sst_file' : "test_data/sumstats.txt", 
-    'n_gwas' : 200000, 
-    'phi' : 1e-2, 
-    'out_dir' : "test_data",
-    "seed" : 42, 
-    "beta_std" : "False", 
-    "n_iter" : 1000,
-    'a': 1, 
-    'b': 0.5, 
-    'n_burnin': 500,
-    'thin': 5
-}
-
-import importlib
-
-#importlib.reload(simulate)
-
-if '1kg' in os.path.basename(param_dict['ref_dir']):
-    ref_df = parse_genet.parse_ref(param_dict['ref_dir'] + '/snpinfo_1kg_hm3')
-elif 'ukbb' in os.path.basename(param_dict['ref_dir']):
-    ref_df = parse_genet.parse_ref(param_dict['ref_dir'] + '/snpinfo_ukbb_hm3')
-ref_df = ref_df[ref_df.CHR == chrom]
-
-vld_df = parse_genet.parse_bim(param_dict['bim_prefix'] + ".bim")
-vld_df = vld_df[vld_df.CHR == chrom]
-
-sst_dict = parse_genet.parse_sumstats(ref_df, vld_df, param_dict['sst_file'], param_dict['n_gwas'])
-
-ld_blk, ld_blk_sym, blk_size = parse_genet.parse_ldblk(param_dict['ref_dir'], sst_dict, chrom)
-
-#mcmc_gtb.mcmc(param_dict['a'], param_dict['b'], param_dict['phi'], sst_dict, param_dict['n_gwas'], ld_blk, blk_size, param_dict['n_iter'], param_dict['n_burnin'], param_dict['thin'], int(chrom), param_dict['out_dir'], param_dict['beta_std'], param_dict['seed'])
-
-
-# collapsed converges in about 100 iterations (random init or zero init)
-import simulate
-beta_true, beta_mrg, annotations = simulate.simulate_sumstats(ld_blk, blk_size, param_dict['n_gwas'], p = len(sst_dict))
-
-# min_iterations = 100, max_iterations = 1000, min_particles = 1, max_particles = 32, stall_window = 10, use_renyi = False, lr = 0.03
-import torch
-device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-
-importlib.reload(vi)
-param_dict['out_dir'] = "collapsed"
-losses, beta, phi_est, sigma_est, stats = vi.vi(sst_dict, param_dict['n_gwas'], ld_blk, blk_size, device = device, annotations = annotations, max_iterations = param_dict['n_iter'], collapsed = True, min_particles = 5, max_particles=5, desired_min_eig = 1e-3, min_iterations = 1000, phi_as_prior = False, lr = 0.03)
-
-plt.plot(losses[:500]); plt.show()
-
-import matplotlib.pyplot as plt
-plt.scatter(beta_true, beta)
-plt.xlabel("True beta")
-plt.ylabel("Infered beta")
-
-stats["annotation_weights"]["mean"]
-stats["annotation_weights"]
-
-# convert standardized beta to per-allele beta
-if param_dict["beta_std"] == 'False':
-    beta /= np.sqrt(2.0*sst_dict['MAF']*(1.0-sst_dict['MAF']))
-    
-sst_dict["beta_shrunk"] = beta
-sst_dict.to_csv
-
-
-param_dict['out_dir'] = "uncollapsed"
-losses, beta = vi.vi(param_dict['phi'], sst_dict, param_dict['n_gwas'], ld_blk, blk_size, param_dict['n_iter'], param_dict['out_dir'], param_dict['beta_std'], param_dict['seed'], collapsed = False, structured_guide = False, eps = 1e-3)
-
-param_dict['out_dir'] = "uncollapsed_structured"
-losses, beta = vi.vi(param_dict['phi'], sst_dict, param_dict['n_gwas'], ld_blk, blk_size, param_dict['n_iter'], param_dict['out_dir'], param_dict['beta_std'], param_dict['seed'], collapsed = False, structured_guide = True, eps = 1e-3)
-
-# estimated phi=0.017, seems reasonable? 
-
-plt.plot(losses)
-
-# -1813 with collapsed model.
-# 1066797075 with uncollapsed! 
-
-
-import pandas as pd
-import matplotlib.pyplot as plt
-
-a = pd.read_csv("collapsed_pst_eff_phi0.4381928641988999_chr22.txt", sep = "\t", names = ["chrom","rsid","pos","ref","alt","beta"])
-b = pd.read_csv("uncollapsed_pst_eff_phi0.05207817962551986_chr22.txt", sep = "\t", names = ["chrom","rsid","pos","ref","alt","beta"])
-c = pd.read_csv("uncollapsed_structured_pst_eff_phi0.05753101022186535_chr22.txt", sep = "\t", names = ["chrom","rsid","pos","ref","alt","beta"])
-
-# none of these agree v well
-plt.scatter(b.beta, c.beta)
-
-
-
