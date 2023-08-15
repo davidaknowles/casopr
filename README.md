@@ -1,10 +1,11 @@
-# PRS-CS
+# CASOPR
+
+Continuous Annotation-aware Shrinkage Of Polygenic Risk (pronounced cassiopeia) is an extension of PRS-CS to leverage arbitrary functional annotations. It additionally uses efficient stochastic variation inference implemented in pyro rather than MCMC. 
 
 **PRS-CS** is a Python based command line tool that infers posterior SNP effect sizes under continuous shrinkage (CS) priors
 using GWAS summary statistics and an external LD reference panel. Details of the method are described in the article:
 
 T Ge, CY Chen, Y Ni, YCA Feng, JW Smoller. Polygenic Prediction via Bayesian Regression and Continuous Shrinkage Priors. *Nature Communications*, 10:1776, 2019.
-
 
 ## Recent Version History
 
