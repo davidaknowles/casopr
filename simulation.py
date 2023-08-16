@@ -19,7 +19,7 @@ import scipy.stats
 chrom = 22
 
 param_dict = {
-    'ref_dir' : "../ld/ldblk_1kg_eur", 
+    'ref_dir' : "/gpfs/commons/groups/knowles_lab/data/ADSP_reguloML/LD_PRScs/ldblk_ukbb_eur/", 
     'bim_prefix' : "test_data/test", 
     'sst_file' : "test_data/sumstats.txt", 
     'n_gwas' : 200000, 
@@ -28,6 +28,8 @@ param_dict = {
     "beta_std" : "False", 
     "n_iter" : 1000
 }
+
+## 'ref_dir' : "../ld/ldblk_1kg_eur", 
 
 if '1kg' in os.path.basename(param_dict['ref_dir']):
     ref_df = parse_genet.parse_ref(param_dict['ref_dir'] + '/snpinfo_1kg_hm3')
