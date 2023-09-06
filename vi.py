@@ -42,19 +42,21 @@ def get_posterior_stats(
 ): 
     
     """ extract posterior samples (somewhat weirdly this is done with `Predictive`) """
+    ## Predicitve is a class
     #guide.requires_grad_(False)
     predictive = Predictive(
         model,             
         guide=guide, 
         num_samples=num_samples) 
-
-    samples = predictive(data)
+    
+    samples = predictive(data) ## get posterior samples
     
     samples["beta"] = torch.zeros(num_samples,data.p,**data.torch_type)
     
+    ## phi is the global scaling, psi is the local one.
     for i in range(num_samples):
         if data.annotations is None: 
-            phi = samples["sqrt_phi"][i]**2 if (phi_known is None) else phi_known
+            phi = samples["sqrt_phi"][i]**2 if (phi_known is None) else phi_known 
         else: 
             sqrt_phi = torch.nn.functional.softplus(data.annotations @ samples["annotation_weights"][i])
             phi = sqrt_phi**2
@@ -92,6 +94,8 @@ def model_collapsed(data, sigma_noise = 1., phi_as_prior = True, sqrt_phi = dist
     zero = torch.tensor(0., **data.torch_type)
     one = torch.tensor(1., **data.torch_type)
     
+    
+    ## handling annotations
     if not data.annotations is None:
         n_annotations = data.annotations.shape[1] 
         annotation_weights = pyro.sample(
@@ -100,7 +104,6 @@ def model_collapsed(data, sigma_noise = 1., phi_as_prior = True, sqrt_phi = dist
         )
 
         sqrt_phi = torch.nn.functional.softplus(data.annotations @ annotation_weights) # or exp?
-        
         sqrt_psi = pyro.sample( # constrain < 1? 
             "sqrt_psi",
              dist.HalfCauchy(sqrt_phi if phi_as_prior else torch.ones(data.p, **data.torch_type)).to_event(1) 
@@ -154,7 +157,7 @@ def model_collapsed(data, sigma_noise = 1., phi_as_prior = True, sqrt_phi = dist
         #    cov += 1e-2 * torch.eye(data.blk_size[kk])
             
         # equivalent to
-        obs = pyro.sample(
+        obs = ∫pyro.sample(
             "obs_%i" % kk, 
             dist.MultivariateNormal(
                 torch.zeros(data.blk_size[kk], **data.torch_type), # will need to get correct dtype and device here

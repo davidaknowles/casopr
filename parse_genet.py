@@ -120,7 +120,7 @@ def parse_ldblk(ldblk_dir, sst_dict, chrom):
     elif 'ukbb' in os.path.basename(ldblk_dir):
         chr_name = ldblk_dir + '/ldblk_ukbb_chr' + str(chrom) + '.hdf5'
 
-    hdf_chr = h5py.File(chr_name, 'r')
+    hdf_chr = h5py.File(chr_name, 'r') ## read ldblk(in hdf5 format)
     n_blk = len(hdf_chr)
     ld_blk = [sp.array(hdf_chr['blk_'+str(blk)]['ldblk']) for blk in range(1,n_blk+1)]
 
@@ -129,10 +129,11 @@ def parse_ldblk(ldblk_dir, sst_dict, chrom):
         snp_blk.append([bb.decode("UTF-8") for bb in list(hdf_chr['blk_'+str(blk)]['snplist'])])
 
     blk_size = []
-    ld_blk_sym = []
-    ld_blk_filt = []
-    mm = 0
+    ld_blk_sym = [] #symmetric matrices -> to gets eigen values
+    ld_blk_filt = [] # get the correctly flipped ones
+    mm = 0 ## mm is the number of SNPs
     for blk in range(n_blk):
+        ## getes the blks where the SNPs were found in the intersection sst_dict
         idx = [ii for (ii, snp) in enumerate(snp_blk[blk]) if snp in sst_dict['SNP'].to_numpy() ]
         #print(len(idx))
         if len(idx) == 0: 
