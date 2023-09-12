@@ -157,7 +157,7 @@ def model_collapsed(data, sigma_noise = 1., phi_as_prior = True, sqrt_phi = dist
         #    cov += 1e-2 * torch.eye(data.blk_size[kk])
             
         # equivalent to
-        obs = ∫pyro.sample(
+        obs = pyro.sample(
             "obs_%i" % kk, 
             dist.MultivariateNormal(
                 torch.zeros(data.blk_size[kk], **data.torch_type), # will need to get correct dtype and device here
