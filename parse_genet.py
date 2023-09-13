@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 """
-Parse the reference panel, summary statistics, and validation set.
+Parse the reference panel, summary statistics, validation set, and annotations.
 
 """
 
@@ -13,7 +13,8 @@ from scipy.stats import norm
 from scipy import linalg
 import h5py
 import pandas as pd
-
+import time
+import torch
 
 def parse_ref(ref_file):
     print('... parse reference file: %s ...' % ref_file)
@@ -157,3 +158,21 @@ def parse_ldblk(ldblk_dir, sst_dict, chrom):
     return ld_blk_filt, ld_blk_sym, blk_size
 
 
+def parse_anno(anno_file, sst_dict):
+    print('... parse annotations ...')
+    
+    t0 = time.time()
+    
+    ## check anno exist
+    if not os.path.exists(anno_file):
+        raise IOError('Cannot find annotation file %s'%(anno_file))
+
+    anno = pd.read_csv(anno_file, compression='gzip',sep = '\t')
+    print('Read %d annotations for %d SNPs'%(anno.shape[1]-5, anno.shape[0]))
+
+    anno_merge = sst_dict[['SNP']].merge(anno, on = 'SNP') 
+    print('total %d SNPs after merging with sst'%(anno_merge.shape[0]))
+
+    anno_torch = torch.cat((torch.ones((anno_merge.shape[0],1)),torch.tensor(anno_merge.iloc[:,5:].values)), dim=1) ## because there are A1, A2, SNP, CHR, and BP
+    print('Done in %0.2f seconds'%(time.time() - t0))
+    return( anno_torch )
