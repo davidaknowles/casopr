@@ -160,19 +160,26 @@ def parse_ldblk(ldblk_dir, sst_dict, chrom):
 
 def parse_anno(anno_file, sst_dict):
     print('... parse annotations ...')
-    
     t0 = time.time()
     
-    ## check anno exist
+    ## check anno file exist 
     if not os.path.exists(anno_file):
         raise IOError('Cannot find annotation file %s'%(anno_file))
 
     anno = pd.read_csv(anno_file, compression='gzip',sep = '\t')
     print('Read %d annotations for %d SNPs'%(anno.shape[1]-5, anno.shape[0]))
 
-    anno_merge = sst_dict[['SNP']].merge(anno, on = 'SNP') 
-    print('total %d SNPs after merging with sst'%(anno_merge.shape[0]))
+    anno_merge = sst_dict[['SNP','A1','A2']].merge(anno, on = 'SNP', suffixes=('', '_y')) 
+    print('Total %d SNPs after merging with sst'%(anno_merge.shape[0]))
+    
+    ## flipping annotations if A1,A2 is opposite with the sst
+    flipping = anno_merge.loc[anno_merge["A1"] == anno_merge['A2_y']]
+    if flipping.shape[0] > 0 :
+        print('Flipping annotaions for %d rows'% flipping.shape[0])
+        for col_index in range(7, anno_merge.shape[1]):
+            anno_merge.loc[anno_merge["A1"] == anno_merge['A2_y'], anno_merge.columns[col_index]] = -anno_merge.iloc[:, col_index]
 
+    anno_merge = anno_merge.drop(["A1_y", 'A2_y'], axis=1)
     anno_torch = torch.cat((torch.ones((anno_merge.shape[0],1)),torch.tensor(anno_merge.iloc[:,5:].values)), dim=1) ## because there are A1, A2, SNP, CHR, and BP
     print('Done in %0.2f seconds'%(time.time() - t0))
     return( anno_torch )
