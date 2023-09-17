@@ -158,19 +158,34 @@ def parse_ldblk(ldblk_dir, sst_dict, chrom):
     return ld_blk_filt, ld_blk_sym, blk_size
 
 
-def parse_anno(anno_file, sst_dict):
+def parse_anno(anno_file, sst_dict, chrom):
     print('... parse annotations ...')
     t0 = time.time()
     
-    ## check anno file exist 
-    if not os.path.exists(anno_file):
-        raise IOError('Cannot find annotation file %s'%(anno_file))
-
-    anno = pd.read_csv(anno_file, compression='gzip',sep = '\t')
-    print('Read %d annotations for %d SNPs'%(anno.shape[1]-5, anno.shape[0]))
-
-    anno_merge = sst_dict[['SNP','A1','A2']].merge(anno, on = 'SNP', suffixes=('', '_y')) 
-    print('Total %d SNPs after merging with sst'%(anno_merge.shape[0]))
+    anno_files = anno_file.split(',') if ',' in anno_file else [anno_file]
+    anno_list = []
+    for anno in anno_files:
+        anno_path = anno + f'{chrom}.annot.gz'
+        if not os.path.exists(anno_path):
+            raise IOError(f'Cannot find annotation file {anno}')
+        anno_list.append(anno_path)
+    print("Reading annotations from %d file(s)... "%len(anno_list))
+    
+    ## parsing multiple annoation files
+    if len(anno_list) == 1:
+        anno_df =pd.read_csv(anno_list[0], compression='gzip',sep = '\t') 
+    else:
+        anno_df_list = [pd.read_csv(file, compression='gzip',sep='\t') for file in anno_list]
+        columns_match = all(anno_df_list[0][['CHR', 'SNP', 'BP', 'A1', 'A2']].equals(df[['CHR', 'SNP', 'BP', 'A1', 'A2']]) for df in anno_df_list[1:])
+        if columns_match:
+            anno_df = pd.concat(anno_df_list, axis=1)
+            anno_df = anno_df.loc[:, ~anno_df.columns.duplicated()]
+        else:
+            raise IOError("Failed to merge annotations")
+    print("Successfully loaded %d annotations for %d SNPs \n" %(anno_df.shape[1]-5, anno_df.shape[0]))
+    
+    anno_merge = sst_dict[['SNP','A1','A2']].merge(anno_df, on = 'SNP', suffixes=('', '_y')) 
+    print('Total of %d SNPs after merging with sst \n'%(anno_merge.shape[0]))
     
     ## flipping annotations if A1,A2 is opposite with the sst
     flipping = anno_merge.loc[anno_merge["A1"] == anno_merge['A2_y']]
@@ -180,6 +195,6 @@ def parse_anno(anno_file, sst_dict):
             anno_merge.loc[anno_merge["A1"] == anno_merge['A2_y'], anno_merge.columns[col_index]] = -anno_merge.iloc[:, col_index]
 
     anno_merge = anno_merge.drop(["A1_y", 'A2_y'], axis=1)
-    anno_torch = torch.cat((torch.ones((anno_merge.shape[0],1)),torch.tensor(anno_merge.iloc[:,5:].values)), dim=1) ## because there are A1, A2, SNP, CHR, and BP
+    anno_torch = torch.cat((torch.ones((anno_merge.shape[0],1)),torch.tensor(anno_merge.iloc[:,5:].values)), dim=1) ## because there are A1, A2, SNP, CHR, and BP. Add torch.ones to meet the requirement for interception
     print('Done in %0.2f seconds'%(time.time() - t0))
-    return( anno_torch )
+    return(anno_torch )

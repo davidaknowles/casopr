@@ -102,8 +102,8 @@ def model_collapsed(data, sigma_noise = 1., phi_as_prior = True, sqrt_phi = dist
             "annotation_weights",
             dist.Normal(zero, one).expand([n_annotations]).to_event(1) 
         )
-
-        sqrt_phi = torch.nn.functional.softplus(data.annotations @ annotation_weights) # or exp?
+        print(data.annotations.double())
+        sqrt_phi = torch.nn.functional.softplus(data.annotations.double() @ annotation_weights) # or exp?
         sqrt_psi = pyro.sample( # constrain < 1? 
             "sqrt_psi",
              dist.HalfCauchy(sqrt_phi if phi_as_prior else torch.ones(data.p, **data.torch_type)).to_event(1) 
