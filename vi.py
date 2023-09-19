@@ -102,8 +102,8 @@ def model_collapsed(data, sigma_noise = 1., phi_as_prior = True, sqrt_phi = dist
             "annotation_weights",
             dist.Normal(zero, one).expand([n_annotations]).to_event(1) 
         )
-        print(data.annotations.double())
-        sqrt_phi = torch.nn.functional.softplus(data.annotations.double() @ annotation_weights) # or exp?
+        #sqrt_phi = torch.nn.functional.softplus(data.annotations @ annotation_weights.double()) 
+        sqrt_phi = torch.nn.functional.softplus(data.annotations @ annotation_weights) # or exp?
         sqrt_psi = pyro.sample( # constrain < 1? 
             "sqrt_psi",
              dist.HalfCauchy(sqrt_phi if phi_as_prior else torch.ones(data.p, **data.torch_type)).to_event(1) 
@@ -136,6 +136,7 @@ def model_collapsed(data, sigma_noise = 1., phi_as_prior = True, sqrt_phi = dist
         idx_blk = torch.arange(mm,mm+data.blk_size[kk])
         
         #first_term = data.ld_blk[kk] @ torch.diag(v[idx_blk]) @ data.ld_blk[kk].T
+        #cov = (data.ld_blk[kk].double() * v[idx_blk]) @ data.ld_blk[kk].double() + data.ld_blk[kk] 
         cov = (data.ld_blk[kk] * v[idx_blk]) @ data.ld_blk[kk] + data.ld_blk[kk] 
         cov = 0.5 * (cov + cov.T) # isn't _quite_ symmetric otherwise
         
@@ -296,7 +297,7 @@ def vi(
         ld_blk: List of LD (Linkage Disequilibrium) blocks.
         blk_size (list of int): Size of LD blocks.
         device (str, optional): torch Device to perform computations on (default is 'cpu').
-        annotations (torch.Tensor, optional): Annotation data: a SNPs x annotations torch.tensor. One column should be all 1s (intercept) (default is None).
+        annotations (torch.Tensor, optional): Annotation data: a SNPs x annotations torch.tensor. One column should be all 1s (intercept) (default is None). Note: Anootations need to be float tensor!
         sigma_noise (optional): If None, sigma_noise will be inferred. If a float, will be fixed to that value (default is None).
         phi (float, optional): If None, phi will be inferred. If a float, will be fixed to that value (default is None).
         phi_as_prior (bool, optional): Whether to represent sqrt_psi ~ HalfCauchy(sqrt_phi) rather than having prior_variance \propto phi * psi. These models are equivalent in principle but inference works quite differently (default is True).

@@ -114,7 +114,7 @@ def parse_sumstats(ref_dict, vld_dict, sst_file, n_subj):
 
 
 def parse_ldblk(ldblk_dir, sst_dict, chrom):
-    print('... parse reference LD on chromosome %d ...' % chrom)
+    #print('... parse reference LD on chromosome %s ...' % chrom)
 
     if '1kg' in os.path.basename(ldblk_dir):
         chr_name = ldblk_dir + '/ldblk_1kg_chr' + str(chrom) + '.hdf5'
@@ -158,7 +158,7 @@ def parse_ldblk(ldblk_dir, sst_dict, chrom):
     return ld_blk_filt, ld_blk_sym, blk_size
 
 
-def parse_anno(anno_file, sst_dict, chrom):
+def parse_anno(anno_file, sst_dict, chrom, flipping=False):
     print('... parse annotations ...')
     t0 = time.time()
     
@@ -187,14 +187,15 @@ def parse_anno(anno_file, sst_dict, chrom):
     anno_merge = sst_dict[['SNP','A1','A2']].merge(anno_df, on = 'SNP', suffixes=('', '_y')) 
     print('Total of %d SNPs after merging with sst \n'%(anno_merge.shape[0]))
     
-    ## flipping annotations if A1,A2 is opposite with the sst
-    flipping = anno_merge.loc[anno_merge["A1"] == anno_merge['A2_y']]
-    if flipping.shape[0] > 0 :
-        print('Flipping annotaions for %d rows'% flipping.shape[0])
-        for col_index in range(7, anno_merge.shape[1]):
-            anno_merge.loc[anno_merge["A1"] == anno_merge['A2_y'], anno_merge.columns[col_index]] = -anno_merge.iloc[:, col_index]
+    ## flipping annotations if A1,A2 is opposite with the sst (default is false)
+    if flipping:
+        flipping = anno_merge.loc[anno_merge["A1"] == anno_merge['A2_y']]
+        if flipping.shape[0] > 0 :
+            print('Flipping annotaions for %d rows'% flipping.shape[0])
+            for col_index in range(7, anno_merge.shape[1]):
+                anno_merge.loc[anno_merge["A1"] == anno_merge['A2_y'], anno_merge.columns[col_index]] = -anno_merge.iloc[:, col_index]
 
     anno_merge = anno_merge.drop(["A1_y", 'A2_y'], axis=1)
     anno_torch = torch.cat((torch.ones((anno_merge.shape[0],1)),torch.tensor(anno_merge.iloc[:,5:].values)), dim=1) ## because there are A1, A2, SNP, CHR, and BP. Add torch.ones to meet the requirement for interception
     print('Done in %0.2f seconds'%(time.time() - t0))
-    return(anno_torch )
+    return(anno_torch.float())
