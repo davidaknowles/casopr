@@ -182,10 +182,10 @@ def parse_anno(anno_file, sst_dict, chrom, flipping=False):
             anno_df = anno_df.loc[:, ~anno_df.columns.duplicated()]
         else:
             raise IOError("Failed to merge annotations")
-    print("Successfully loaded %d annotations for %d SNPs \n" %(anno_df.shape[1]-5, anno_df.shape[0]))
+    print("Successfully loaded %d annotations for %d SNPs" %(anno_df.shape[1]-5, anno_df.shape[0]))
     
     anno_merge = sst_dict[['SNP','A1','A2']].merge(anno_df, on = 'SNP', suffixes=('', '_y')) 
-    print('Total of %d SNPs after merging with sst \n'%(anno_merge.shape[0]))
+    print('Total of %d SNPs left after merging with sst'%(anno_merge.shape[0]))
     
     ## flipping annotations if A1,A2 is opposite with the sst (default is false)
     if flipping:
@@ -197,5 +197,5 @@ def parse_anno(anno_file, sst_dict, chrom, flipping=False):
 
     anno_merge = anno_merge.drop(["A1_y", 'A2_y'], axis=1)
     anno_torch = torch.cat((torch.ones((anno_merge.shape[0],1)),torch.tensor(anno_merge.iloc[:,5:].values)), dim=1) ## because there are A1, A2, SNP, CHR, and BP. Add torch.ones to meet the requirement for interception
-    print('Done in %0.2f seconds'%(time.time() - t0))
-    return(anno_torch.float())
+    print('Done in %0.2f seconds \n'%(time.time() - t0))
+    return(anno_torch.float(),anno_df.columns[5:])

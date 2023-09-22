@@ -8,7 +8,7 @@ from pyro.infer import SVI, Trace_ELBO, RenyiELBO
 from pyro.infer import Predictive
 from pyro.distributions import constraints
 from pyro.distributions.util import eye_like
-
+import time
 from torch.distributions.transforms import AffineTransform, SigmoidTransform
 
 from scipy.stats import norm
@@ -297,7 +297,7 @@ def vi(
         ld_blk: List of LD (Linkage Disequilibrium) blocks.
         blk_size (list of int): Size of LD blocks.
         device (str, optional): torch Device to perform computations on (default is 'cpu').
-        annotations (torch.Tensor, optional): Annotation data: a SNPs x annotations torch.tensor. One column should be all 1s (intercept) (default is None). Note: Anootations need to be float tensor!
+        annotations (torch.Tensor, optional): Annotation data: a SNPs x annotations torch.tensor. One column should be all 1s (intercept) (default is None). Note: Annotations need to be float tensor!
         sigma_noise (optional): If None, sigma_noise will be inferred. If a float, will be fixed to that value (default is None).
         phi (float, optional): If None, phi will be inferred. If a float, will be fixed to that value (default is None).
         phi_as_prior (bool, optional): Whether to represent sqrt_psi ~ HalfCauchy(sqrt_phi) rather than having prior_variance \propto phi * psi. These models are equivalent in principle but inference works quite differently (default is True).
@@ -314,8 +314,8 @@ def vi(
             - stats (dict): Dictionary containing posterior statistics.
     """
     
-    print('... SVI ...')
-    
+    print('... Starting SVI ...')
+    t0 = time.time()
     torch_type = {"dtype":torch.float, "device": device}
 
     # derived stats
@@ -379,5 +379,6 @@ def vi(
     else: 
         sqrt_phi = data.annotations @ stats["annotation_weights"]["mean"]
         phi_est = sqrt_phi**2
-
+        
+    print('Done in %0.2f seconds \n'%(time.time() - t0))
     return losses, beta_est, phi_est, stats
