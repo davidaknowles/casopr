@@ -198,4 +198,4 @@ def parse_anno(anno_file, sst_dict, chrom, flipping=False):
     anno_merge = anno_merge.drop(["A1_y", 'A2_y'], axis=1)
     anno_torch = torch.cat((torch.ones((anno_merge.shape[0],1)),torch.tensor(anno_merge.iloc[:,5:].values)), dim=1) ## because there are A1, A2, SNP, CHR, and BP. Add torch.ones to meet the requirement for interception
     print('Done in %0.2f seconds \n'%(time.time() - t0))
-    return(anno_torch.float(),anno_df.columns[5:])
+    return(anno_torch.float(),anno_df.columns[5:].tolist())
