@@ -77,3 +77,5 @@ def stratified_LDSC(annotations, beta_mrg, ld_blk, blk_size):
     tau = torch.linalg.solve(ldscore.T @ ldscore, ldscore.T @ chi2)
 
     return tau
+
+
