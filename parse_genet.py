@@ -44,7 +44,10 @@ def parse_sumstats(ref_dict, vld_dict, sst_file, n_subj):
     sst_snp = set(zip(sst_dict['SNP'], sst_dict['A1'], sst_dict['A2'])) | set(zip(sst_dict['SNP'], sst_dict['A2'], sst_dict['A1'])) | \
               set(zip(sst_dict['SNP'], [mapping[aa] for aa in sst_dict['A1']], [mapping[aa] for aa in sst_dict['A2']])) | \
               set(zip(sst_dict['SNP'], [mapping[aa] for aa in sst_dict['A2']], [mapping[aa] for aa in sst_dict['A1']]))
-
+    
+    # if sst_file == 'test_data/wightman_chr22.tsv':
+    #         comm_snp = vld_snp & ref_snp 
+    # else:
     comm_snp = vld_snp & ref_snp & sst_snp
 
     print('... %d common SNPs in the reference, sumstats, and validation set ...' % len(comm_snp))
@@ -113,7 +116,7 @@ def parse_sumstats(ref_dict, vld_dict, sst_file, n_subj):
     return pd.DataFrame(sst_dict)
 
 
-def parse_ldblk(ldblk_dir, sst_dict, chrom):
+def parse_ldblk(ldblk_dir, sst_dict, chrom, sim=False):
     #print('... parse reference LD on chromosome %s ...' % chrom)
 
     if '1kg' in os.path.basename(ldblk_dir):
@@ -135,7 +138,14 @@ def parse_ldblk(ldblk_dir, sst_dict, chrom):
     mm = 0 ## mm is the number of SNPs
     for blk in range(n_blk):
         ## getes the blks where the SNPs were found in the intersection sst_dict
-        idx = [ii for (ii, snp) in enumerate(snp_blk[blk]) if snp in sst_dict['SNP'].to_numpy() ]
+        if sim:
+            print('sim')
+            idx = [ii for (ii, snp) in enumerate(snp_blk[blk])] 
+            print(len(idx))
+    
+        else:
+            idx = [ii for (ii, snp) in enumerate(snp_blk[blk]) if snp in sst_dict['SNP'].to_numpy()]
+            
         #print(len(idx))
         if len(idx) == 0: 
             continue
