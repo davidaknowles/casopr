@@ -6,12 +6,21 @@ import parse_genet
 ## add anno
 def simulate_sumstats(ld_blk, blk_size, n_gwas, p, sst_dict,prop_nz = 0.2, beta_sd = 0.1, sigma_noise = 1., anno_path= False, chrom=22): 
     sigma_over_sqrt_n = sigma_noise / torch.sqrt(torch.tensor(n_gwas))
+    print('prop_nz = %f'%prop_nz)
     nz = torch.rand(p) < prop_nz ## filter the snp with p threshold < prop_nz ## creating perfect annotation
     ## nz: the perfect annotaion (1 for causal, 0 for not); ## should add some noise here too
     beta_true = torch.where(nz, beta_sd * torch.randn(p), torch.zeros(p)) ## torch.randn = random normal distribution
 
     ### reading annotations
-    annotations, anno_names = parse_genet.parse_anno(anno_path, sst_dict, chrom = chrom)
+    
+    if anno_path == False :
+        annotations = torch.stack([torch.ones(p),nz,torch.randn(p)]).T # intercept, useful annotation, random annotation
+        anno_names = ["perfect anno",'random anno']
+        print('simulating anno...')
+       
+    else:
+        annotations, anno_names = parse_genet.parse_anno(anno_path, sst_dict, chrom = chrom)
+        
     beta_mrg = torch.zeros(p)
     mm = 0
     for kk in range(len(ld_blk)):
@@ -68,3 +77,5 @@ def stratified_LDSC(annotations, beta_mrg, ld_blk, blk_size):
     tau = torch.linalg.solve(ldscore.T @ ldscore, ldscore.T @ chi2)
 
     return tau
+
+
