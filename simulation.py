@@ -19,7 +19,7 @@ import scipy.stats
 chrom = 22
 
 param_dict = {
-    'ref_dir' : "/gpfs/commons/groups/knowles_lab/data/ADSP_reguloML/LD_PRScs/ldblk_ukbb_eur/", 
+    'ref_dir' : "/gpfs/commons/groups/knowles_lab/data/ADSP_reguloML/LD_PRScs/ldblk_ukbb_eur", 
     'bim_prefix' : "test_data/test", 
     'sst_file' : "test_data/sumstats.txt", 
     'n_gwas' : 200000, 
@@ -46,7 +46,7 @@ ld_blk, ld_blk_sym, blk_size = parse_genet.parse_ldblk(param_dict['ref_dir'], ss
 
 #mcmc_gtb.mcmc(param_dict['a'], param_dict['b'], param_dict['phi'], sst_dict, param_dict['n_gwas'], ld_blk, blk_size, param_dict['n_iter'], param_dict['n_burnin'], param_dict['thin'], int(chrom), param_dict['out_dir'], param_dict['beta_std'], param_dict['seed'])
 
-beta_true, beta_mrg, annotations = simulate.simulate_sumstats(ld_blk, blk_size, param_dict['n_gwas'], p = len(sst_dict))
+beta_true, beta_mrg, annotations = simulate.simulate_sumstats_easy(ld_blk, blk_size, param_dict['n_gwas'], p = len(sst_dict))
 
 sst_dict["BETA"] = beta_mrg
 
