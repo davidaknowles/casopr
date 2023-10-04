@@ -12,7 +12,6 @@ def simulate_sumstats(ld_blk, blk_size, n_gwas, p, sst_dict,prop_nz = 0.2, beta_
     beta_true = torch.where(nz, beta_sd * torch.randn(p), torch.zeros(p)) ## torch.randn = random normal distribution
 
     ### reading annotations
-    
     if anno_path == False :
         annotations = torch.stack([torch.ones(p),nz,torch.randn(p)]).T # intercept, useful annotation, random annotation
         anno_names = ["perfect anno",'random anno']
