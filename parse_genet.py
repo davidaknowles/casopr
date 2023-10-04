@@ -116,7 +116,53 @@ def parse_sumstats(ref_dict, vld_dict, sst_file, n_subj):
     return pd.DataFrame(sst_dict)
 
 
-def parse_ldblk(ldblk_dir, sst_dict, chrom, sim=False):
+def parse_ldblk(ldblk_dir, sst_dict, chrom):
+    #print('... parse reference LD on chromosome %s ...' % chrom)
+
+    if '1kg' in os.path.basename(ldblk_dir):
+        chr_name = ldblk_dir + '/ldblk_1kg_chr' + str(chrom) + '.hdf5'
+    elif 'ukbb' in os.path.basename(ldblk_dir):
+        chr_name = ldblk_dir + '/ldblk_ukbb_chr' + str(chrom) + '.hdf5'
+
+    hdf_chr = h5py.File(chr_name, 'r') ## read ldblk(in hdf5 format)
+    n_blk = len(hdf_chr)
+    ld_blk = [sp.array(hdf_chr['blk_'+str(blk)]['ldblk']) for blk in range(1,n_blk+1)]
+
+    snp_blk = []
+    for blk in range(1,n_blk+1):
+        snp_blk.append([bb.decode("UTF-8") for bb in list(hdf_chr['blk_'+str(blk)]['snplist'])])
+
+    blk_size = []
+    ld_blk_sym = [] #symmetric matrices -> to gets eigen values
+    ld_blk_filt = [] # get the correctly flipped ones
+    mm = 0 ## mm is the number of SNPs
+    
+    for blk in range(n_blk):
+        idx = [ii for (ii, snp) in enumerate(snp_blk[blk]) if snp in sst_dict['SNP'].to_numpy() ]
+        #print(len(idx))
+        if len(idx) == 0: 
+            continue
+            
+        blk_size.append(len(idx))
+        
+        idx_blk = np.arange(mm,mm+len(idx))
+        flip = sst_dict['FLP'][idx_blk]
+        ld_blk_here = ld_blk[blk][sp.ix_(idx,idx)]*sp.outer(flip,flip)
+        ld_blk_filt.append(ld_blk_here)
+        
+        #_, s, v = linalg.svd(ld_blk_here)
+        #h = sp.dot(v.T, sp.dot(sp.diag(s), v)) # just weird way of getting transpose?! 
+        #ld_blk_sym.append( (ld_blk_here+h)/2 )
+        
+        ld_blk_sym.append( (ld_blk_here+ld_blk_here.T)/2 )
+
+        mm += len(idx)
+        
+    return ld_blk_filt, ld_blk_sym, blk_size
+
+
+
+def parse_ldblk_test(ldblk_dir, sst_dict, chrom, sim=False):
     #print('... parse reference LD on chromosome %s ...' % chrom)
 
     if '1kg' in os.path.basename(ldblk_dir):
