@@ -161,12 +161,17 @@ def main():
         sst_dict = parse_genet.parse_sumstats(ref_df, vld_df, param_dict['sst_file'], param_dict['n_gwas'])
 
         ld_blk, ld_blk_sym, blk_size = parse_genet.parse_ldblk(param_dict['ref_dir'], sst_dict, chrom)
-
+        
         
         vi.vi(param_dict['phi'], sst_dict, param_dict['n_gwas'], ld_blk, blk_size, 
             param_dict['n_iter'], int(chrom), param_dict['out_dir'], param_dict['beta_std'], param_dict['seed'])
         
-        losses, beta, phi_est, stats = vi.vi(sst_dict, param_dict['n_gwas'], ld_blk, blk_size, device = device, annotations = None, max_iterations = param_dict['n_iter'], min_particles = 1, max_particles=4, desired_min_eig = 1e-3, min_iterations = 200, stall_window = 30, phi_as_prior = False, lr = 0.03, constrain_sigma = True)
+        if anno_path == None:
+            print('running with no annotations')
+            losses, beta, phi_est, stats = vi.vi(sst_dict, param_dict['n_gwas'], ld_blk, blk_size, device = device, annotations = None, max_iterations = param_dict['n_iter'], min_particles = 1, max_particles=4, desired_min_eig = 1e-3, min_iterations = 200, stall_window = 30, phi_as_prior = False, lr = 0.03, constrain_sigma = True)
+        else:
+            annotations = parse_genet.parse_anno(anno, sst_dist, chrom)
+            losses, beta, phi_est, stats = vi.vi(sst_dict, param_dict['n_gwas'], ld_blk, blk_size, device = device, annotations = annotations, max_iterations = param_dict['n_iter'], min_particles = 1, max_particles=4, desired_min_eig = 1e-3, min_iterations = 200, stall_window = 30, phi_as_prior = False, lr = 0.03, constrain_sigma = True)
 
         if param_dict["beta_std"] == 'False':
             beta /= np.sqrt(2.0*sst_dict['MAF']*(1.0-sst_dict['MAF']))

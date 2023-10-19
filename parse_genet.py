@@ -15,6 +15,7 @@ import h5py
 import pandas as pd
 import time
 import torch
+import simulate
 
 def parse_ref(ref_file):
     print('... parse reference file: %s ...' % ref_file)
@@ -44,10 +45,7 @@ def parse_sumstats(ref_dict, vld_dict, sst_file, n_subj):
     sst_snp = set(zip(sst_dict['SNP'], sst_dict['A1'], sst_dict['A2'])) | set(zip(sst_dict['SNP'], sst_dict['A2'], sst_dict['A1'])) | \
               set(zip(sst_dict['SNP'], [mapping[aa] for aa in sst_dict['A1']], [mapping[aa] for aa in sst_dict['A2']])) | \
               set(zip(sst_dict['SNP'], [mapping[aa] for aa in sst_dict['A2']], [mapping[aa] for aa in sst_dict['A1']]))
-    
-    # if sst_file == 'test_data/wightman_chr22.tsv':
-    #         comm_snp = vld_snp & ref_snp 
-    # else:
+
     comm_snp = vld_snp & ref_snp & sst_snp
 
     print('... %d common SNPs in the reference, sumstats, and validation set ...' % len(comm_snp))
@@ -84,6 +82,7 @@ def parse_sumstats(ref_dict, vld_dict, sst_file, n_subj):
 
     sst_dict = {'CHR':[], 'SNP':[], 'BP':[], 'A1':[], 'A2':[], 'MAF':[], 'BETA':[], 'FLP':[]}
     ref_dict.reset_index(inplace=True)
+    
     for (ii, snp) in enumerate(ref_dict['SNP']):
         if snp in sst_eff:
             sst_dict['SNP'].append(snp)
@@ -112,8 +111,14 @@ def parse_sumstats(ref_dict, vld_dict, sst_file, n_subj):
                 sst_dict['A2'].append(mapping[a1])
                 sst_dict['MAF'].append(1-ref_dict['MAF'][ii])
                 sst_dict['FLP'].append(-1)
+    
+    
+    sst_df = pd.DataFrame(sst_dict)
+    sst_file = pd.read_csv(sst_file, sep = "\t")
+    sst_df = sst_df.merge(sst_file[['SNP', 'P']], on='SNP', how='left')
+    
+    return sst_df
 
-    return pd.DataFrame(sst_dict)
 
 
 def parse_ldblk(ldblk_dir, sst_dict, chrom):
@@ -214,44 +219,50 @@ def parse_ldblk_test(ldblk_dir, sst_dict, chrom, sim=False):
     return ld_blk_filt, ld_blk_sym, blk_size
 
 
+
 def parse_anno(anno_file, sst_dict, chrom, flipping=False):
+    """
+    If no annotations is fed, will simulate perfect annotations defined in simulate.py
+    """
     print('... parse annotations ...')
     t0 = time.time()
-    
-    anno_files = anno_file.split(',') if ',' in anno_file else [anno_file]
-    anno_list = []
-    for anno in anno_files:
-        anno_path = anno + f'{chrom}.annot.gz'
-        if not os.path.exists(anno_path):
-            raise IOError(f'Cannot find annotation file {anno}')
-        anno_list.append(anno_path)
-    print("Reading annotations from %d file(s)... "%len(anno_list))
-    
-    ## parsing multiple annoation files
-    if len(anno_list) == 1:
-        anno_df =pd.read_csv(anno_list[0], compression='gzip',sep = '\t') 
+    if anno_file ==False:
+        return simulate.simulate_perfect_anno(sst_dict)
     else:
-        anno_df_list = [pd.read_csv(file, compression='gzip',sep='\t') for file in anno_list]
-        columns_match = all(anno_df_list[0][['CHR', 'SNP', 'BP', 'A1', 'A2']].equals(df[['CHR', 'SNP', 'BP', 'A1', 'A2']]) for df in anno_df_list[1:])
-        if columns_match:
-            anno_df = pd.concat(anno_df_list, axis=1)
-            anno_df = anno_df.loc[:, ~anno_df.columns.duplicated()]
-        else:
-            raise IOError("Failed to merge annotations")
-    print("Successfully loaded %d annotations for %d SNPs" %(anno_df.shape[1]-5, anno_df.shape[0]))
-    
-    anno_merge = sst_dict[['SNP','A1','A2']].merge(anno_df, on = 'SNP', suffixes=('', '_y')) 
-    print('Total of %d SNPs left after merging with sst'%(anno_merge.shape[0]))
-    
-    ## flipping annotations if A1,A2 is opposite with the sst (default is false)
-    if flipping:
-        flipping = anno_merge.loc[anno_merge["A1"] == anno_merge['A2_y']]
-        if flipping.shape[0] > 0 :
-            print('Flipping annotaions for %d rows'% flipping.shape[0])
-            for col_index in range(7, anno_merge.shape[1]):
-                anno_merge.loc[anno_merge["A1"] == anno_merge['A2_y'], anno_merge.columns[col_index]] = -anno_merge.iloc[:, col_index]
+        anno_files = anno_file.split(',') if ',' in anno_file else [anno_file]
+        anno_list = []
+        for anno in anno_files:
+            anno_path = anno + f'{chrom}.annot.gz'
+            if not os.path.exists(anno_path):
+                raise IOError(f'Cannot find annotation file {anno}')
+            anno_list.append(anno_path)
+        print("Reading annotations from %d file(s)... "%len(anno_list))
 
-    anno_merge = anno_merge.drop(["A1_y", 'A2_y'], axis=1)
-    anno_torch = torch.cat((torch.ones((anno_merge.shape[0],1)),torch.tensor(anno_merge.iloc[:,5:].values)), dim=1) ## because there are A1, A2, SNP, CHR, and BP. Add torch.ones to meet the requirement for interception
-    print('Done in %0.2f seconds \n'%(time.time() - t0))
-    return(anno_torch.float(),anno_df.columns[5:].tolist())
+        ## parsing multiple annoation files
+        if len(anno_list) == 1:
+            anno_df =pd.read_csv(anno_list[0], compression='gzip',sep = '\t') 
+        else:
+            anno_df_list = [pd.read_csv(file, compression='gzip',sep='\t') for file in anno_list]
+            columns_match = all(anno_df_list[0][['CHR', 'SNP', 'BP', 'A1', 'A2']].equals(df[['CHR', 'SNP', 'BP', 'A1', 'A2']]) for df in anno_df_list[1:])
+            if columns_match:
+                anno_df = pd.concat(anno_df_list, axis=1)
+                anno_df = anno_df.loc[:, ~anno_df.columns.duplicated()]
+            else:
+                raise IOError("Failed to merge annotations")
+        print("Successfully loaded %d annotations for %d SNPs" %(anno_df.shape[1]-5, anno_df.shape[0]))
+
+        anno_merge = sst_dict[['SNP','A1','A2']].merge(anno_df, on = 'SNP', suffixes=('', '_y')) 
+        print('Total of %d SNPs left after merging with sst'%(anno_merge.shape[0]))
+
+        ## flipping annotations if A1,A2 is opposite with the sst (default is false)
+        if flipping:
+            flipping = anno_merge.loc[anno_merge["A1"] == anno_merge['A2_y']]
+            if flipping.shape[0] > 0 :
+                print('Flipping annotaions for %d rows'% flipping.shape[0])
+                for col_index in range(7, anno_merge.shape[1]):
+                    anno_merge.loc[anno_merge["A1"] == anno_merge['A2_y'], anno_merge.columns[col_index]] = -anno_merge.iloc[:, col_index]
+
+        anno_merge = anno_merge.drop(["A1_y", 'A2_y'], axis=1)
+        anno_torch = torch.cat((torch.ones((anno_merge.shape[0],1)),torch.tensor(anno_merge.iloc[:,5:].values)), dim=1) ## because there are A1, A2, SNP, CHR, and BP. Add torch.ones to meet the requirement for interception
+        print('Done in %0.2f seconds \n'%(time.time() - t0))
+        return(anno_torch.float(),anno_df.columns[5:].tolist())

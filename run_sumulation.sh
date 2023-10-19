@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH --job-name=phi
+#SBATCH --job-name=sigma_True
 #SBATCH --partition=pe2
 #SBATCH --nodes=1           # minimum number of nodes to be allocated
 #SBATCH --ntasks=1          # number of tasks
@@ -21,4 +21,10 @@ all_anno='/gpfs/commons/groups/knowles_lab/data/ADSP_reguloML/annotations/annota
 
 
 
-python test_simulation.py name anno test_on refit_time prop_nz phi_prior constrain_sigma True True --refit_time=2
+python test_simulation.py just_testing False sim 0.2 True True --refit_time 3
+
+# usage: test_simulation.py [-h] [--refit_time REFIT_TIME] [--lr LR]
+#                           [--chrom CHROM]
+#                           save_fig_name anno_path test_on prop_nz phi_as_prior
+#                           constrain_sigma
+

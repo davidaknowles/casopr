@@ -4,20 +4,31 @@ import torch
 import parse_genet
 
 ## add anno
-def simulate_sumstats(ld_blk, blk_size, n_gwas, p, sst_dict,prop_nz = 0.2, beta_sd = 0.1, sigma_noise = 1., anno_path= False, chrom=22): 
+def simulate_sumstats(ld_blk, blk_size, n_gwas, p, sst_dict, prop_nz = 0.2, beta_sd = 0.1, sigma_noise = 1., anno_path= False, chrom=22): 
     sigma_over_sqrt_n = sigma_noise / torch.sqrt(torch.tensor(n_gwas))
     print('prop_nz = %f'%prop_nz)
     nz = torch.rand(p) < prop_nz ## filter the snp with p threshold < prop_nz ## creating perfect annotation
     ## nz: the perfect annotaion (1 for causal, 0 for not); ## should add some noise here too
     beta_true = torch.where(nz, beta_sd * torch.randn(p), torch.zeros(p)) ## torch.randn = random normal distribution
-
+    #print(beta_true)
     ### reading annotations
     if anno_path == False :
-        annotations = torch.stack([torch.ones(p),nz,torch.randn(p)]).T # intercept, useful annotation, random annotation
-        anno_names = ["perfect anno",'random anno']
         print('simulating anno...')
+        if sst_dict.shape[0] > 1000:
+            print('using real betas from sumstats ...')
+            #beta_true = sst_dict['BETA']
+            nz = abs(beta_true) < prop_nz
+            #nz = torch.tensor(nz.values.astype(float)) 
+            annotations = torch.stack([torch.ones(p),nz,torch.randn(p)]).T
+            #print(nz.sum())
+        else:
+            print('simulating betas...')
+            annotations = torch.stack([torch.ones(p),nz,torch.randn(p)]).T # intercept, useful annotation, random annotation
+        
+        anno_names = ["perfect anno",'random anno']
        
     else:
+        print('using the existed anno')
         annotations, anno_names = parse_genet.parse_anno(anno_path, sst_dict, chrom = chrom)
         
     beta_mrg = torch.zeros(p)
@@ -35,7 +46,14 @@ def simulate_sumstats(ld_blk, blk_size, n_gwas, p, sst_dict,prop_nz = 0.2, beta_
     #annotations_double = annotations.double()
     return beta_true, beta_mrg, annotations, anno_names
 
-
+def simulate_perfect_anno(sst, prop_nz = 0.2):
+    nz = torch.tensor(sst['P'] < prop_nz)
+    n = sst.shape[0]
+    annotations = torch.stack([torch.ones(n),nz,torch.randn(n)]).T
+    anno_names = ["perfect anno",'random anno']
+    return annotations, anno_names
+    
+    
 def simulate_sumstats_easy(ld_blk, blk_size, n_gwas, p, prop_nz = 0.2, beta_sd = 0.1, sigma_noise = 1. ): 
     sigma_over_sqrt_n = sigma_noise / torch.sqrt(torch.tensor(n_gwas))
     nz = torch.rand(p) < prop_nz ## filter the snp with p threshold < prop_nz ## creating perfect annotation
