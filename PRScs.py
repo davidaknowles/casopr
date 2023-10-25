@@ -11,6 +11,10 @@ Reference: T Ge, CY Chen, Y Ni, YCA Feng, JW Smoller. Polygenic Prediction via B
 Usage:
 python PRScs.py --ref_dir=PATH_TO_REFERENCE --bim_prefix=VALIDATION_BIM_PREFIX --sst_file=SUM_STATS_FILE --n_gwas=GWAS_SAMPLE_SIZE --out_dir=OUTPUT_DIR
                 [--a=PARAM_A --b=PARAM_B --phi=PARAM_PHI --n_iter=MCMC_ITERATIONS --n_burnin=MCMC_BURNIN --thin=MCMC_THINNING_FACTOR --chrom=CHROM --seed=SEED]
+                
+"""
+
+"""
 
  - PATH_TO_REFERENCE: Full path (including folder name) to the directory
                       that contains information on the LD reference panel (the snpinfo file and hdf5 files).
@@ -85,8 +89,11 @@ def parse_param():
     long_opts_list = ['ref_dir=', 'bim_prefix=', 'sst_file=', 'a=', 'b=', 'phi=', 'n_gwas=',
                       'n_iter=', 'n_burnin=', 'thin=', 'out_dir=', 'chrom=', 'beta_std=', 'seed=', 'help']
 
-    param_dict = {'ref_dir': None, 'bim_prefix': None, 'sst_file': None, 'a': 1, 'b': 0.5, 'phi': None, 'n_gwas': None,
-                  'n_iter': 1000, 'n_burnin': 500, 'thin': 5, 'out_dir': None, 'chrom': range(1,23), 'beta_std': 'False', 'seed': None}
+    # param_dict = {'ref_dir': None, 'bim_prefix': None, 'sst_file': None, 'a': 1, 'b': 0.5, 'phi': None, 'n_gwas': None,
+    #               'n_iter': 1000, 'n_burnin': 500, 'thin': 5, 'out_dir': None, 'chrom': range(1,23), 'beta_std': 'False', 'seed': None}
+    
+    param_dict = {'ref_dir': '/gpfs/commons/groups/knowles_lab/data/ADSP_reguloML/LD_PRScs/ldblk_ukbb_eur', 'bim_prefix': "test_data/test", 'sst_file': "test_data/sumstats.txt", 'a': 1, 'b': 0.5, 'phi': None, 'n_gwas': 200000,
+                  'n_iter': 1000, 'n_burnin': 500, 'thin': 5, 'out_dir': '/gpfs/commons/home/tlin/script/casopr ', 'chrom': 22, 'beta_std': 'False', 'seed': None}
 
     print('\n')
 
@@ -144,8 +151,8 @@ def parse_param():
 
 
 def main():
+    print('test')
     param_dict = parse_param()
-
     for chrom in param_dict['chrom']:
         print('##### process chromosome %d #####' % int(chrom))
 
@@ -160,9 +167,9 @@ def main():
 
         sst_dict = parse_genet.parse_sumstats(ref_df, vld_df, param_dict['sst_file'], param_dict['n_gwas'])
 
-        ld_blk, ld_blk_sym, blk_size = parse_genet.parse_ldblk(param_dict['ref_dir'], sst_dict, chrom)
+        ld_blk, ld_blk_sym, blk_size = parse_genet.parse_ldblk(param_dict['ref_dir'], sst_dict, chrom)       
         
-        
+        ## prscs uses mcmc here
         vi.vi(param_dict['phi'], sst_dict, param_dict['n_gwas'], ld_blk, blk_size, 
             param_dict['n_iter'], int(chrom), param_dict['out_dir'], param_dict['beta_std'], param_dict['seed'])
         
@@ -180,3 +187,7 @@ def main():
         sst_dict.to_csv(param_dict['out_dir'] + "_chrom%s" % chrom, sep = "\t")
 
         print('\n')
+        
+        
+        if __name__ == '__main__':
+            main()

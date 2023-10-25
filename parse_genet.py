@@ -220,14 +220,21 @@ def parse_ldblk_test(ldblk_dir, sst_dict, chrom, sim=False):
 
 
 
-def parse_anno(anno_file, sst_dict, chrom, flipping=False):
+def parse_anno(anno_file, sst_dict, chrom, prop_nz, flipping=False):
     """
-    If no annotations is fed, will simulate perfect annotations defined in simulate.py
+    If no annotation is fed(anno_file = False), will simulate perfect annotations defined in simulate.py
+    
+    If don't want to use any annotation, use anno_file = 'None'
+    flipping annotations if A1,A2 is opposite with the sst (default is false)
     """
     print('... parse annotations ...')
     t0 = time.time()
-    if anno_file ==False:
-        return simulate.simulate_perfect_anno(sst_dict)
+    if anno_file == False:
+        print('Use perfect annotation')
+        return simulate.simulate_perfect_anno(sst_dict, prop_nz = prop_nz)
+    elif anno_file == None:
+        print('No annotation used')
+        return(None, None)
     else:
         anno_files = anno_file.split(',') if ',' in anno_file else [anno_file]
         anno_list = []
