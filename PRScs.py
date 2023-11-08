@@ -92,8 +92,10 @@ def parse_param():
     # param_dict = {'ref_dir': None, 'bim_prefix': None, 'sst_file': None, 'a': 1, 'b': 0.5, 'phi': None, 'n_gwas': None,
     #               'n_iter': 1000, 'n_burnin': 500, 'thin': 5, 'out_dir': None, 'chrom': range(1,23), 'beta_std': 'False', 'seed': None}
     
-    param_dict = {'ref_dir': '/gpfs/commons/groups/knowles_lab/data/ADSP_reguloML/LD_PRScs/ldblk_ukbb_eur', 'bim_prefix': "test_data/test", 'sst_file': "test_data/sumstats.txt", 'a': 1, 'b': 0.5, 'phi': None, 'n_gwas': 200000,
-                  'n_iter': 1000, 'n_burnin': 500, 'thin': 5, 'out_dir': '/gpfs/commons/home/tlin/script/casopr ', 'chrom': 22, 'beta_std': 'False', 'seed': None}
+    
+    param_dict = {'ref_dir': '/gpfs/commons/groups/knowles_lab/data/ADSP_reguloML/LD_PRScs/ldblk_ukbb_eur', 'bim_prefix': "test_data/test", 
+                  'sst_file': "test_data/sumstats.txt", 'a': 1, 'b': 0.5, 'phi': None, 'n_gwas': 200000, 'n_iter': 1000, 'n_burnin': 500, 'thin': 5, 
+                  'out_dir': '/gpfs/commons/home/tlin/script/casopr ', 'chrom': 22, 'beta_std': 'False', 'seed': None}
 
     print('\n')
 
@@ -151,7 +153,6 @@ def parse_param():
 
 
 def main():
-    print('test')
     param_dict = parse_param()
     for chrom in param_dict['chrom']:
         print('##### process chromosome %d #####' % int(chrom))
@@ -189,5 +190,5 @@ def main():
         print('\n')
         
         
-        if __name__ == '__main__':
-            main()
+if __name__ == '__main__':
+    main()

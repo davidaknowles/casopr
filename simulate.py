@@ -9,13 +9,15 @@ def simulate_sumstats(ld_blk, blk_size, n_gwas, p, sst_dict, prop_nz = 0.2, beta
     print('prop_nz = %f'%prop_nz)
     nz = torch.rand(p) < prop_nz ## filter the snp with p threshold < prop_nz ## creating perfect annotation
     ## nz: the perfect annotaion (1 for causal, 0 for not); ## should add some noise here too
+    sim_beta = True
     beta_true = torch.where(nz, beta_sd * torch.randn(p), torch.zeros(p)) ## torch.randn = random normal distribution
     ### reading annotations
-    if anno_path == False :
-        print('simulating anno...')
+    if anno_path == False : ## perfect anno
+        print('simulating perfect anno...')
         if sst_dict.shape[0] > 10000:
+            sim_beta = False
             print('using real betas from sumstats ...')
-            #beta_true = sst_dict['BETA']
+            beta_true = sst_dict['BETA']
             nz = abs(beta_true) < prop_nz
             #nz = torch.tensor(nz.values.astype(float)) 
             annotations = torch.stack([torch.ones(p),nz,torch.randn(p)]).T
@@ -26,8 +28,8 @@ def simulate_sumstats(ld_blk, blk_size, n_gwas, p, sst_dict, prop_nz = 0.2, beta
         
         anno_names = ["perfect anno",'random anno']
        
-    else:
-        print('using the existed anno')
+    else: ## either use anno provided in path, or no anno
+        print('simulating betas...')
         annotations, anno_names = parse_genet.parse_anno(anno_path, sst_dict, chrom = chrom, prop_nz = prop_nz)
         
     beta_mrg = torch.zeros(p)
@@ -43,6 +45,8 @@ def simulate_sumstats(ld_blk, blk_size, n_gwas, p, sst_dict, prop_nz = 0.2, beta
         # covariance_matrix = ld_torch * sigma_over_sqrt_n**2).rsample()
         mm += blk_size[kk]
     #annotations_double = annotations.double()
+    
+    
     return beta_true, beta_mrg, annotations, anno_names
 
 def simulate_perfect_anno(sst, prop_nz = 0.2):

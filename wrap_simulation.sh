@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH --job-name=no_anno_0.2
+#SBATCH --job-name=no_anno
 #SBATCH --mail-type=FAIL,END
 #SBATCH --mail-user=tlin@nygenome.org
 #SBATCH --mem=10G
@@ -26,7 +26,7 @@ all_anno='/gpfs/commons/groups/knowles_lab/data/ADSP_reguloML/annotations/annota
 #python test_simulation.py prop_nz_0.05_sim --refit_time 1
 #python test_simulation.py prop_nz_0.1_chr22 False chr22 0.1 True True --refit_time 20
 #python test_simulation.py prop_nz_0.2_chr22_original_fixed False chr22 0.2 True True --refit_time 20
-python test_simulation.py no_anno_prop_nz_0.05 None chr22 0.05 True True --refit_time 20
+python test_simulation.py no_anno_simbeta None chr22 0.2 True True --refit_time 2
 #python test_simulation.py test False chr22 0.2 True True --refit_time 1
 #python test_simulation.py prop_nz_0.2_chr22 False chr22 0.2 True True --refit_time 20
 
