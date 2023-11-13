@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH --job-name=no_anno
+#SBATCH --job-name=sim_beta
 #SBATCH --mail-type=FAIL,END
 #SBATCH --mail-user=tlin@nygenome.org
 #SBATCH --mem=10G
