@@ -32,6 +32,20 @@ class Data:
     annotations: torch.Tensor
     torch_type: dict
     
+def sim_anno_weight(num_anno):
+    num_zero = num_anno//3
+    zero_indices = torch.randperm(num_anno)[:num_zero]
+    mask_zero = torch.zeros(num_anno)
+    mask_zero[zero_indices] = 1.0
+
+    alpha = torch.ones(num_anno - num_zero)  # Dirichlet distribution parameters
+    values = pyro.sample("values", dist.Dirichlet(alpha).expand([1]).to_event(1))
+
+    result = torch.zeros(num_anno)
+    result[mask_zero.bool()] = 0.0
+    result[~mask_zero.bool()] = values
+    return(result)
+
 def get_posterior_stats(
     model,
     guide, 
@@ -94,14 +108,21 @@ def model_collapsed(data, sigma_noise = 1., phi_as_prior = True, sqrt_phi = dist
     zero = torch.tensor(0., **data.torch_type)
     one = torch.tensor(1., **data.torch_type)
     
-    
     ## handling annotations
     if not data.annotations is None:
         n_annotations = data.annotations.shape[1] 
+        
+        ## original one
         annotation_weights = pyro.sample(
             "annotation_weights",
             dist.Normal(zero, one).expand([n_annotations]).to_event(1) 
         )
+        print('ori',annotation_weights)
+        
+        ## simulate weights
+        # annotation_weights = sim_anno_weight(n_annotations) ## change to simulated weight
+        # print('diriculet',annotation_weights)
+        # print('')
         #sqrt_phi = torch.nn.functional.softplus(data.annotations @ annotation_weights.double()) 
         sqrt_phi = torch.nn.functional.softplus(data.annotations @ annotation_weights) # or exp?
         sqrt_psi = pyro.sample( # constrain < 1? 
@@ -167,6 +188,8 @@ def model_collapsed(data, sigma_noise = 1., phi_as_prior = True, sqrt_phi = dist
             obs = data.beta_mrg[idx_blk])
         
         mm += data.blk_size[kk]
+        
+    
 
         
 def psi_guide(data):
@@ -339,9 +362,8 @@ def vi(
     sqrt_phi = dist.HalfCauchy(one) if (phi is None) else np.sqrt(phi).to(**torch_type)
     
     sigma_noise = dist.HalfCauchy(one) if (sigma_noise is None) else sigma_noise # dist.Gamma(2. * one, 2. * one), dist.InverseGamma(0.001 * one, 0.001 * one)
-    
-    model = lambda dat: model_collapsed(dat, sigma_noise = sigma_noise, phi_as_prior = phi_as_prior, sqrt_phi = sqrt_phi, desired_min_eig = desired_min_eig)    
-    
+    model = lambda dat: model_collapsed(dat, sigma_noise = sigma_noise, phi_as_prior = phi_as_prior, sqrt_phi = sqrt_phi, desired_min_eig = desired_min_eig)       
+
     guide = AutoGuideList(model)
     
     to_expose = []

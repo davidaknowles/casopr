@@ -21,12 +21,21 @@ all_anno='/gpfs/commons/groups/knowles_lab/data/ADSP_reguloML/annotations/annota
 # python test_simulation.py phi_prior_true_chr22 $all_anno chr22 0.2 True True --refit_time 10 &
 # python test_simulation.py phi_prior_false_chr22 $all_anno chr22 0.2 False True --refit_time 10 
 
+
+    parser.add_argument("save_fig_name", type=str, help="Save figure name")
+    parser.add_argument("anno_path", type=str, help="Annotation path")
+    parser.add_argument("test_on", type=str, help="chr22 or sim")
+    parser.add_argument("prop_nz", type=str, help="Proportion of non-zero values (default: 0.2)")
+    parser.add_argument("phi_as_prior", type=bool, help="Phi as prior (default: True)")
+
 ## test perfect anno
 #python test_simulation.py prop_nz_0.1_chr22 False chr22 0.1 True True --refit_time 10	
 #python test_simulation.py prop_nz_0.05_sim --refit_time 1
 #python test_simulation.py prop_nz_0.1_chr22 False chr22 0.1 True True --refit_time 20
 #python test_simulation.py prop_nz_0.2_chr22_original_fixed False chr22 0.2 True True --refit_time 20
-python test_simulation.py no_anno_simbeta None chr22 0.2 True True --refit_time 2
+#python test_simulation.py no_anno_phi_true None chr22 0.2 True True --refit_time 10
+python test_simulation.py no_anno_phi_false None chr22 0.2 False True --refit_time 10
+
 #python test_simulation.py test False chr22 0.2 True True --refit_time 1
 #python test_simulation.py prop_nz_0.2_chr22 False chr22 0.2 True True --refit_time 20
 

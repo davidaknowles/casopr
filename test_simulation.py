@@ -11,6 +11,7 @@ import torch
 import matplotlib.pyplot as plt
 import numpy as np
 
+import mcmc_gtb
 import pyro.distributions as dist
 
 import scipy.stats
@@ -21,10 +22,31 @@ import string
 import random
 import time
 import datetime
+from scipy.stats import mannwhitneyu
 import argparse
 
-def check_sim_result(save_fig_name, anno_path, test = 'chr22', refit_time=1,prop_nz = 0.2,phi_as_prior = True, constrain_sigma = True, lr = 0.03, chrom=22, prscs_file = 'test_data/ibd_wightman_pst_eff_a1_b0.5_phi1e-02_chr22.txt'):
+
+
+def get_name(save_fig_name, refit_time):
+    random_name = ''.join(random.choices(string.ascii_lowercase +string.digits, k=3))
+    date = pd.Timestamp(datetime.date.today()).strftime("%m%d")
+    save_dir = '/gpfs/commons/home/tlin/pic/casioPR/simulation/' + date
+    if not os.path.isdir(save_dir):
+        os.mkdir(save_dir)
+        print('creating dir %s'%save_dir)
+    path= save_dir + '/' + save_fig_name + '_' + 'iter%d'%refit_time +'_'+random_name +'_'
+    return(path)
+
+def get_beta_stats(betas):
+    pearson_r = betas.iloc[:, 2:].apply(lambda column: column.corr(betas.beta_true))
+    mse_values = betas.iloc[:, 2:].apply(lambda column: np.mean((column - betas.beta_true)**2))
+    utest= betas.iloc[:, 2:].apply(lambda column: mannwhitneyu(column,betas.beta_true, alternative='two-sided'))
+    beta_stats = pd.DataFrame({'pearsonR': pearson_r, 'MSE': mse_values,'Mannwhitney': utest[1:].values.flatten()})
+    return(beta_stats)
+
+def check_sim_result(save_fig_name, anno_path, test = 'chr22', refit_time=1,prop_nz = 0.2,phi_as_prior = True, constrain_sigma = True, lr = 0.03, chrom=22, prscs_file = 'test_data/ibd_wightman_pst_eff_a1_b0.5_phi1e-02_chr22.txt', sim_beta = True):
     ## initializing
+    run_prscs = False
     chr22_dict =  {
     'ref_dir' : '/gpfs/commons/groups/knowles_lab/data/ADSP_reguloML/LD_PRScs/ldblk_ukbb_eur',
     'bim_prefix' : "test_data/ADSP_qc_chr22",
@@ -33,8 +55,9 @@ def check_sim_result(save_fig_name, anno_path, test = 'chr22', refit_time=1,prop
     'out_dir' : "test_data",
     "seed" : 42, 
     "beta_std" : "False", 
-    "n_iter" : 1000
-    }
+    "n_iter" : 1000,
+    'a': 1, 'b': 0.5, 'phi': None,
+    'n_burnin': 500, 'thin': 5}
 
     sim_dict = {
         'ref_dir' : '/gpfs/commons/groups/knowles_lab/data/ADSP_reguloML/LD_PRScs/ldblk_ukbb_eur', 
@@ -54,7 +77,7 @@ def check_sim_result(save_fig_name, anno_path, test = 'chr22', refit_time=1,prop
         param_dict = sim_dict
         print('sim 1k SNP')
     
-    ## change the parameters to the right dtypes.
+    ## change the parameters to the right dtypes
     if type(refit_time == str):
         refit_time = int(refit_time)
         prop_nz = float(prop_nz)
@@ -67,13 +90,7 @@ def check_sim_result(save_fig_name, anno_path, test = 'chr22', refit_time=1,prop
         anno_path = None
     
     ## handling the pic saving repo
-    random_name = ''.join(random.choices(string.ascii_lowercase +string.digits, k=3))
-    date = pd.Timestamp(datetime.date.today()).strftime("%m%d")
-    save_dir = '/gpfs/commons/home/tlin/pic/casioPR/simulation/' + date
-    if not os.path.isdir(save_dir):
-        os.mkdir(save_dir)
-        print('creating dir %s'%save_dir)
-    path= save_dir + '/' + save_fig_name + '_' + 'iter%d'%refit_time +'_'+random_name +'_'
+    path = get_name(save_fig_name, refit_time)
     print("fig will be saved in %s"%path)
     
     ## start the function
@@ -86,10 +103,9 @@ def check_sim_result(save_fig_name, anno_path, test = 'chr22', refit_time=1,prop
     vld_df = parse_genet.parse_bim(param_dict['bim_prefix'] + ".bim")
     vld_df = vld_df[vld_df.CHR == chrom]
     sst_dict = parse_genet.parse_sumstats(ref_df, vld_df, param_dict['sst_file'], param_dict['n_gwas'])
-    
-                                                                                                                             
-    ## define if simulating sumstat (beta  
-    if param_dict['sst_file'] == "test_data/wightman_chr22.tsv": # real case doesn't need simulated betas  
+                                                   
+    ##  define if simulating sumstat (beta 
+    if (param_dict['sst_file'] == "test_data/wightman_chr22.tsv") & (sim_beta != True) : # real case uses betas from sumstat, not the simulated betas 
         prscs_beta = pd.read_csv(prscs_file, sep = '\t', header = None, names = ['CHR','SNP','BP','A1','A2','PRSCS_beta'])
         sst_dict = sst_dict.merge( prscs_beta[['SNP','PRSCS_beta']], on = 'SNP') 
         ld_blk, ld_blk_sym, blk_size = parse_genet.parse_ldblk(param_dict['ref_dir'], sst_dict, chrom)        
@@ -102,50 +118,48 @@ def check_sim_result(save_fig_name, anno_path, test = 'chr22', refit_time=1,prop
         print("There are %s ld_block. \n" %(len(ld_blk)))
         beta_true, beta_mrg, annotations, anno_names = simulate.simulate_sumstats(ld_blk, blk_size, param_dict['n_gwas'], len(sst_dict), sst_dict,anno_path = anno_path, chrom=chrom,prop_nz = prop_nz)
         sst_dict["BETA"] = beta_mrg
-    
-    
-    '''
-    this might be wrong!!! not really passing through the prop_nz
-    '''
-    # if param_dict['anno_path'] == False:  ## This will be sim
-    #     ld_blk, ld_blk_sym, blk_size = parse_genet.parse_ldblk(param_dict['ref_dir'], sst_dict, chrom)
-    #     print("There are %s ld_block. \n" %(len(ld_blk)))
-    #     beta_true, beta_mrg, annotations, anno_names = simulate.simulate_sumstats(ld_blk, blk_size, param_dict['n_gwas'], len(sst_dict), sst_dict,anno_path = param_dict['anno_path'], chrom=chrom,prop_nz = prop_nz)
-    #     sst_dict["BETA"] = beta_mrg
-    # else: ## real case doesn't need simulated betas   
-    #     prscs_beta = pd.read_csv(prscs_file, sep = '\t', header = None, names = ['CHR','SNP','BP','A1','A2','PRSCS_beta'])
-    #     sst_dict = sst_dict.merge( prscs_beta[['SNP','PRSCS_beta']], on = 'SNP') 
-    #     ld_blk, ld_blk_sym, blk_size = parse_genet.parse_ldblk(param_dict['ref_dir'], sst_dict, chrom)        
-    #     print("There are %s ld_block. \n" %(len(ld_blk)))
-    #     annotations, anno_names =  parse_genet.parse_anno(param_dict["anno_path"], sst_dict, chrom = chrom,prop_nz = prop_nz)
-    #     beta_true = sst_dict['PRSCS_beta']
+ 
     if anno_path != None:
-        anno_names.insert(0,'intercept')
-        
+        anno_names.insert(0,'intercept')    
 
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     print("start VI...")
     #one = torch.tensor(1., device=device)
     
-    pearsonr_list=[]
+    #pearsonr_list=[]
     anno_list=pd.DataFrame()
-
+    betas = pd.DataFrame({'beta_true':beta_true, 'beta_marginal':beta_mrg})
     for i in range(refit_time):
         print('Re-train the model %d time(s)'% (i+1))
-        losses, beta, phi_est, stats = vi.vi(sst_dict, param_dict['n_gwas'], ld_blk, blk_size, device = device, annotations = annotations, max_iterations = param_dict['n_iter'], max_particles=4, desired_min_eig = 1e-3, min_iterations = 200, stall_window = 30, phi_as_prior = phi_as_prior, lr = 0.03, constrain_sigma = constrain_sigma)
+        losses, beta, phi_est, stats =  vi.vi(sst_dict, param_dict['n_gwas'], ld_blk, blk_size, device = device, annotations = annotations, max_iterations = param_dict['n_iter'], max_particles=4, desired_min_eig = 1e-3, min_iterations = 200, stall_window = 30, phi_as_prior = phi_as_prior, lr = 0.03, constrain_sigma = constrain_sigma)
         print('phi_prior %s'%phi_as_prior)
         print('constrain_sigma %s'%constrain_sigma)
+        column_name = f'beta_casioPR_{i + 1}'
+        betas[column_name] = beta
         plt.plot(losses);plt.title('losses');#plt.savefig(save_dir + '/loss/'+ param_dict['save_fig_name'] + '_' + 'iter%d'%refit_time +'_'+random_name +'_' +'loss_%s.png'%i);
-        
-        anno_df = pd.DataFrame.from_dict(stats["annotation_weights"] )
-        anno_list = anno_list.append(anno_df["mean"].to_frame().T, ignore_index=True) 
+        if anno_path != None:
+            anno_df = pd.DataFrame.from_dict(stats["annotation_weights"] )
+            anno_list = anno_list.append(anno_df["mean"].to_frame().T, ignore_index=True) 
         if i == refit_time-1:
             plt.savefig(path+'loss.pdf',format ='pdf',bbox_inches='tight'); plt.show()
-            
-        r=scipy.stats.pearsonr(beta_true,beta)[0]   
-        pearsonr_list.append(r)
+    
+    if (run_prscs == True):
+        beta_prscs = mcmc_gtb.mcmc(param_dict['a'], param_dict['b'], None, sst_dict, param_dict['n_gwas'], ld_blk, blk_size, param_dict['n_iter'], param_dict['n_burnin'], param_dict['thin'], int(chrom), param_dict['out_dir'], param_dict['beta_std'], param_dict['seed'])
+        betas['beta_prscs'] = beta_prscs.flatten()
+    
+    ##  save beta
+    print('saving beta')
+    betas.to_csv(path+'betas.tsv', sep = '\t', index = False)
+    
+    # print('saving sim_anno_weight')
+    # anno_weight_sim.to_csv(path+'anno_weight_sim.tsv', sep = '\t', index = False)
+    
+    
+    ## get pearson, MSE, and mannwhitney U test 
+    beta_stats = get_beta_stats(betas)
+    beta_stats.to_csv(path+'betas_stat.tsv', sep = '\t', index = False)
 
-    ## check anno_weight (only when annotation exist)
+    ##  check anno_weight (only when annotation exist)
     if anno_path != None:
         anno_list.to_csv(path+'_annoweight.csv')
         plt.figure()
@@ -170,27 +184,31 @@ def check_sim_result(save_fig_name, anno_path, test = 'chr22', refit_time=1,prop
             plt.title('annotation weights')
             plt.savefig(path+'anno_weight_scatter.pdf',format ='pdf');plt.show()   
            
-    ## plot pearson r between the beta of PRSCS and CasioPR
+    ##  plot pearson r between the beta of PRSCS and CasioPR 
+    pearsonr_list = beta_stats['pearsonR']
     if (refit_time >20):
         plt.figure(num=None, figsize=(17, 8))
     else:
         plt.figure()
-    plt.plot(range(refit_time), pearsonr_list, marker='o', linestyle='--', color='c')
+        
+    if (run_prscs == True):
+        prscs_r = pearsonr_list[len(pearsonr_list)-1]
+        pearsonr_list = pearsonr_list[:-1]
+        plt.axhline(y = prscs_r, color = 'steelblue', linestyle = ':', label = 'PRSCS(MCMC)') 
+    if (refit_time >20):
+        plt.figure(num=None, figsize=(17, 8))
+    else:
+        plt.figure()
+        
+    plt.plot(range(refit_time), pearsonr_list, marker='o', linestyle='--', color='lightcoral', label = 'CasioPR(VI)')
     ax = plt.axes()
     ax.set_ylim(0, 1)
     plt.xticks(list(range(refit_time)),list(range(1,refit_time+1)))
-    plt.title('pearson r for betas in every iteration')
+    plt.title('pearson r for est betas with marginal beta in every re-fitted model')
+    plt.legend(bbox_to_anchor = (0.82, 0.2), loc = 'center') 
     plt.savefig(path+'betas.pdf',format ='pdf');plt.show()  
     
-    f = open(path+'person_r.txt', "w")
-    f.write(str(pearsonr_list))
-    f.close()
- 
-    print('\n')
-    print('person R list')
-    print(pearsonr_list)
-    
-    return(anno_list,pearsonr_list)        
+    return(anno_list,betas)        
 
 
 if __name__ == "__main__":
@@ -214,4 +232,8 @@ if __name__ == "__main__":
     
     
 
-    
+'''
+Note:
+anno_path: If set to False, will use the perfect annotation. If set to None, won't use any annotation. If you have annotations, just put the patn of the annotation.
+
+'''
