@@ -33,18 +33,22 @@ class Data:
     torch_type: dict
     
 def sim_anno_weight(num_anno):
-    num_zero = num_anno//3
-    zero_indices = torch.randperm(num_anno)[:num_zero]
-    mask_zero = torch.zeros(num_anno)
-    mask_zero[zero_indices] = 1.0
+#     num_zero = num_anno//3
+#     zero_indices = torch.randperm(num_anno)[:num_zero]
+#     mask_zero = torch.zeros(num_anno)
+#     mask_zero[zero_indices] = 1.0
 
-    alpha = torch.ones(num_anno - num_zero)  # Dirichlet distribution parameters
-    values = pyro.sample("values", dist.Dirichlet(alpha).expand([1]).to_event(1))
-
-    result = torch.zeros(num_anno)
-    result[mask_zero.bool()] = 0.0
-    result[~mask_zero.bool()] = values
-    return(result)
+#     alpha = torch.ones(num_anno - num_zero)  # Dirichlet distribution parameters
+#     values = pyro.sample("annotations_weights", dist.Dirichlet(alpha).expand([1]).to_event(1))
+#     result = torch.zeros(num_anno)
+#     result[mask_zero.bool()] = 0.0
+#     result[~mask_zero.bool()] = values
+#     return(result)
+    
+    prior = torch.ones(num_anno + 1) / (num_anno + 1)
+    annotations_weight = pyro.sample("annotations_weight", dist.Dirichlet(prior)).expand([num_anno]).to_event(1) 
+    return(annotations_weight)
+    
 
 def get_posterior_stats(
     model,
@@ -101,7 +105,7 @@ def convertr(hyperparam, name, device):
     ) else pyro.sample(name, hyperparam)
 
 
-def model_collapsed(data, sigma_noise = 1., phi_as_prior = True, sqrt_phi = dist.HalfCauchy(1.), desired_min_eig = 1e-6): 
+def model_collapsed(data, sigma_noise = 1., phi_as_prior = False, sqrt_phi = dist.HalfCauchy(1.), desired_min_eig = 1e-6, weight_dist = 'dirict'): 
     
     device = data.beta_mrg.device
     
@@ -113,22 +117,24 @@ def model_collapsed(data, sigma_noise = 1., phi_as_prior = True, sqrt_phi = dist
         n_annotations = data.annotations.shape[1] 
         
         ## original one
-        annotation_weights = pyro.sample(
-            "annotation_weights",
-            dist.Normal(zero, one).expand([n_annotations]).to_event(1) 
-        )
-        print('ori',annotation_weights)
-        
+        if weight_dist == 'Normal':
+            annotation_weights = pyro.sample(
+                "annotation_weights",
+                dist.Normal(zero, one).expand([n_annotations]).to_event(1) 
+            )
+        else:
         ## simulate weights
-        # annotation_weights = sim_anno_weight(n_annotations) ## change to simulated weight
-        # print('diriculet',annotation_weights)
-        # print('')
-        #sqrt_phi = torch.nn.functional.softplus(data.annotations @ annotation_weights.double()) 
+            prior = torch.ones(n_annotations ) / (n_annotations + 1)
+            annotation_weights = pyro.sample("annotation_weights", dist.Dirichlet(prior))
+            #annotation_weights = sim_anno_weight(n_annotations) ## change to simulated weight
+#        
+        
         sqrt_phi = torch.nn.functional.softplus(data.annotations @ annotation_weights) # or exp?
         sqrt_psi = pyro.sample( # constrain < 1? 
             "sqrt_psi",
              dist.HalfCauchy(sqrt_phi if phi_as_prior else torch.ones(data.p, **data.torch_type)).to_event(1) 
         )
+            
     else: 
         sqrt_phi = convertr(sqrt_phi, "sqrt_phi", device = device)
         sqrt_psi = pyro.sample( # constrain < 1? 
@@ -139,7 +145,6 @@ def model_collapsed(data, sigma_noise = 1., phi_as_prior = True, sqrt_phi = dist
     psi = sqrt_psi**2
     
     v = psi if phi_as_prior else phi*psi
-    
     initial_trace_flag = (v > 1).any().item() # hack. better way to do this? 
             
     sigma_noise = convertr(sigma_noise, "sigma_noise", device = device)
@@ -151,7 +156,7 @@ def model_collapsed(data, sigma_noise = 1., phi_as_prior = True, sqrt_phi = dist
     sigma_over_sqrt_n = sigma_noise / torch.sqrt(torch_n)
     
     mm = 0
-    for kk in range(len(data.ld_blk)):
+    for kk in range(len(data.ld_blk)): ## for every LD block
         assert(data.blk_size[kk] > 0)
         
         idx_blk = torch.arange(mm,mm+data.blk_size[kk])
@@ -188,7 +193,7 @@ def model_collapsed(data, sigma_noise = 1., phi_as_prior = True, sqrt_phi = dist
             obs = data.beta_mrg[idx_blk])
         
         mm += data.blk_size[kk]
-        
+       
     
 
         
@@ -304,7 +309,7 @@ def vi(
     annotations = None,
     sigma_noise = None, 
     phi = None, 
-    phi_as_prior = True,
+    phi_as_prior = False,
     constrain_psi = True, 
     constrain_sigma = False,
     desired_min_eig = 1e-3, 
@@ -323,7 +328,7 @@ def vi(
         annotations (torch.Tensor, optional): Annotation data: a SNPs x annotations torch.tensor. One column should be all 1s (intercept) (default is None). Note: Annotations need to be float tensor!
         sigma_noise (optional): If None, sigma_noise will be inferred. If a float, will be fixed to that value (default is None).
         phi (float, optional): If None, phi will be inferred. If a float, will be fixed to that value (default is None).
-        phi_as_prior (bool, optional): Whether to represent sqrt_psi ~ HalfCauchy(sqrt_phi) rather than having prior_variance \propto phi * psi. These models are equivalent in principle but inference works quite differently (default is True).
+        phi_as_prior (bool, optional): Whether to represent sqrt_psi ~ HalfCauchy(sqrt_phi) rather than having prior_variance \propto phi * psi. These models are equivalent in principle but inference works quite differently (default changed from true to false).
         constrain_psi (bool, optional): Constrain psi parameter to [0,1] (default is True).
         constrain_sigma (bool, optional): Constrain sigma_noise parameter to [0,1] (default is False).
         desired_min_eig (float, optional): Desired minimum eigenvalue of LD matrices and covariances (default is 1e-3).
@@ -360,16 +365,13 @@ def vi(
     
     one = torch.tensor(1., **torch_type)
     sqrt_phi = dist.HalfCauchy(one) if (phi is None) else np.sqrt(phi).to(**torch_type)
-    
     sigma_noise = dist.HalfCauchy(one) if (sigma_noise is None) else sigma_noise # dist.Gamma(2. * one, 2. * one), dist.InverseGamma(0.001 * one, 0.001 * one)
     model = lambda dat: model_collapsed(dat, sigma_noise = sigma_noise, phi_as_prior = phi_as_prior, sqrt_phi = sqrt_phi, desired_min_eig = desired_min_eig)       
-
-    guide = AutoGuideList(model)
     
+    guide = AutoGuideList(model)
     to_expose = []
     if not (annotations is None): to_expose.append("annotation_weights")
     if phi is None: to_expose.append("sqrt_phi")
-    
     if len(to_expose) > 0: 
         guide.add(AutoDiagonalNormal(
             poutine.block(
@@ -385,7 +387,6 @@ def vi(
                 model,
                 expose = ["sigma_noise"]),
             init_loc_fn = init_to_value(values={"sigma_noise" : one})))    
-    
     guide.add(psi_guide if constrain_psi else AutoDiagonalNormal(
         poutine.block(
             model,
@@ -393,7 +394,6 @@ def vi(
         init_loc_fn = init_to_value(values={"sqrt_psi" : torch.sqrt(torch.full([p],0.1,**torch_type))})))
     
     losses = my_optimizer(model, guide, data, **opt_kwargs)
-                    
     stats = get_posterior_stats(model, guide, data, phi, phi_as_prior = phi_as_prior)
     beta_est = stats["beta"]["mean"].squeeze().cpu().numpy()
     if data.annotations is None: 

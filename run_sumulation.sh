@@ -1,11 +1,11 @@
 #!/bin/bash
-#SBATCH --job-name=sigma_True
+#SBATCH --job-name=dirichlet_dist
 #SBATCH --partition=pe2
 #SBATCH --nodes=1           # minimum number of nodes to be allocated
 #SBATCH --ntasks=1          # number of tasks
 #SBATCH --cpus-per-task=8   # number of cores on the CPU for the task
 #SBATCH --mem=5G
-#SBATCH --time=24:00:00
+#SBATCH --time=64:00:00
 #SBATCH --output=/gpfs/commons/home/tlin/pic/casioPR/simulation/%x_%j.log
 
 
@@ -21,7 +21,9 @@ all_anno='/gpfs/commons/groups/knowles_lab/data/ADSP_reguloML/annotations/annota
 
 
 
-python test_simulation.py just_testing False sim 0.2 True True --refit_time 3
+python test_simulation.py dirichlet_dist_add_noise $bl_anno chr22 0.2 False True --refit_time 20
+#python test_simulation.py normal_dist $bl_anno chr22 0.2 False True --refit_time 10
+
 
 # usage: test_simulation.py [-h] [--refit_time REFIT_TIME] [--lr LR]
 #                           [--chrom CHROM]

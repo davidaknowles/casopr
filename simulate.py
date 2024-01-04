@@ -9,8 +9,15 @@ def simulate_sumstats(ld_blk, blk_size, n_gwas, p, sst_dict, prop_nz = 0.2, beta
     print('prop_nz = %f'%prop_nz)
     nz = torch.rand(p) < prop_nz ## filter the snp with p threshold < prop_nz ## creating perfect annotation
     ## nz: the perfect annotaion (1 for causal, 0 for not); ## should add some noise here too
+    
     sim_beta = True
     beta_true = torch.where(nz, beta_sd * torch.randn(p), torch.zeros(p)) ## torch.randn = random normal distribution
+    
+    if (True):
+        print('add noise')
+        noise = (2 * torch.rand(p)- 1 )* 0.01
+        nz = nz+noise
+    
     ### reading annotations
     if anno_path == False : ## perfect anno
         print('simulating perfect anno...')

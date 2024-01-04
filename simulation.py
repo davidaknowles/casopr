@@ -58,7 +58,7 @@ losses, beta, phi_est, stats = vi.vi(sst_dict, param_dict['n_gwas'], ld_blk, blk
 
 # observations: 
 # collapsed >> uncollapsed (deleted uncollapsed code)
-# phi_as_prior = False seems to give better results, but phi_as_prior = True gives more robust training (less noisy loss), probably because constraint on psi is more useful. 
+# phi_as_prior = False seems to give better results , but phi_as_prior = True gives more robust training (less noisy loss), probably because constraint on psi is more useful. 
 # Does constrain_sigma help? I think constrain_psi does. 
 # Seem to need desired_min_eig=1e-3 at least to avoid numerical issues. Could go lower if using float64 it seemed. 
 
