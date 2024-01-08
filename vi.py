@@ -314,6 +314,7 @@ def vi(
     constrain_sigma = False,
     desired_min_eig = 1e-3, 
     gaussian_anno_weight = True, 
+    noise_size = 0,
     **opt_kwargs
 ):
     """Variational inference for PRSCS model

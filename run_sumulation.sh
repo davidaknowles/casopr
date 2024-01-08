@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH --job-name=normal_dist_bigger_noise
+#SBATCH --job-name=dirichlet_dist
 #SBATCH --partition=pe2
 #SBATCH --nodes=1           # minimum number of nodes to be allocated
 #SBATCH --ntasks=1          # number of tasks
@@ -21,8 +21,24 @@ all_anno='/gpfs/commons/groups/knowles_lab/data/ADSP_reguloML/annotations/annota
 
 
 
+#python test_simulation.py --save_fig_name normal_no_noise --anno_path False --test_on chr22 --gaussian_anno_weight True --noise_size 0 --refit_time 20
+
+#python test_simulation.py --save_fig_name normal_big_noise --anno_path False --test_on chr22 --gaussian_anno_weight True --noise_size 0.1 --refit_time 20
+
+#python test_simulation.py --save_fig_name normal_noise --anno_path False --test_on chr22 --gaussian_anno_weight True --noise_size 0.01 --refit_time 20
+
+
+
+#python test_simulation.py --save_fig_name normal_no_noise --anno_path False --test_on chr22 --gaussian_anno_weight False --noise_size 0 --refit_time 20
+
+#python test_simulation.py --save_fig_name normal_big_noise --anno_path False --test_on chr22 --gaussian_anno_weight True --noise_size 0.1 --refit_time 20
+
+python test_simulation.py --save_fig_name normal_noise --anno_path False --test_on chr22 --gaussian_anno_weight True --noise_size 0.01 --refit_time 20
+
+
+
 #python test_simulation.py normal_dist_add_noise $bl_anno chr22 0.2 False True --refit_time 20
-python test_simulation.py normal_dist_add_bigger_noise False chr22 0.2 False True --refit_time 5
+#python test_simulation.py normal_dist_add_bigger_noise False chr22 0.2 False True --refit_time 5
 
 #python test_simulation.py normal_dist $bl_anno chr22 0.2 False True --refit_time 10
 

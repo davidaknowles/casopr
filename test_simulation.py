@@ -1,6 +1,6 @@
 '''
 Usage:
-python test_simulation.py --save_fig_name --anno_path --test_on (defult sim) --refit_time (default: 10) --chrom (defult 22)
+python test_simulation.py --save_fig_name --anno_path --test_on (defult sim) --refit_time (default: 10) --chrom (defult 22) --gaussian_anno_weight (default True) --noise_size (default 0.1)
 
 - anno_path: If set to False, will use the perfect annotation. If set to None, won't use any annotation. If you have annotations, just put the path of the annotation.
 
@@ -75,7 +75,7 @@ def plot_pearsonr(beta_stats, include_prscs, refit_time, path):
     plt.show()  
     
 
-def check_sim_result(save_fig_name, anno_path, test, refit_time ,gaussian_anno_weight=True, prop_nz = 0.2, phi_as_prior = False, constrain_sigma = True, lr = 0.03, chrom=22, run_prscs = True):
+def check_sim_result(save_fig_name, anno_path, test, gaussian_anno_weight=True, noise_size = 0, refit_time = 10,prop_nz = 0.2, phi_as_prior = False, constrain_sigma = True, lr = 0.03, chrom=22, run_prscs = True):
     ## initializing
 
     chr_dict =  {
@@ -142,7 +142,7 @@ def check_sim_result(save_fig_name, anno_path, test, refit_time ,gaussian_anno_w
     for i in tqdm(range(refit_time)):
         print('Re-train the model %d time(s)'% (i+1))
         losses, beta, phi_est, stats =  vi.vi(sst_dict, param_dict['n_gwas'], ld_blk, blk_size, device = device, annotations = annotations, max_iterations = param_dict['n_iter'], max_particles=4, desired_min_eig = 1e-3, min_iterations = 200, stall_window = 30, phi_as_prior = phi_as_prior, lr = lr, constrain_sigma = constrain_sigma,
-        gaussian_anno_weight = gaussian_anno_weight)
+        gaussian_anno_weight = gaussian_anno_weight, noise_size = noise_size)
         column_name = f'beta_casioPR_{i + 1}'
         betas[column_name] = beta
         plt.plot(losses);plt.title('losses')
@@ -204,6 +204,7 @@ if __name__ == "__main__":
     parser.add_argument("--anno_path", type=str, default = None, help="Annotation path")
     parser.add_argument("--test_on", type=str, default = 'sim', help="chr22 or sim")
     parser.add_argument("--gaussian_anno_weight", type=bool, default = 'True', help="gaussian or dirichlet anno weights")
+    parser.add_argument("--noise_size", type=float, default = 0.1)
     parser.add_argument("--refit_time", type=int, default=10, help="Refit time (default: 20)")
     parser.add_argument("--lr", type=float, default=0.03, help="Learning rate (default: 0.03)")
     parser.add_argument("--chrom", type=int, default=22, help="Chromosome (default: 22)")
@@ -217,7 +218,7 @@ if __name__ == "__main__":
     print(' ')
     print('====== Start Running CasioPR ====== \n')
     #print("start testing params")
-    check_sim_result(args.save_fig_name, args.anno_path, args.test_on, refit_time = args.refit_time, lr = args.lr, chrom = args.chrom)
+    check_sim_result(args.save_fig_name, args.anno_path, args.test_on, gaussian_anno_weight = args.gaussian_anno_weight, noise_size = args.noise_size, refit_time = args.refit_time, lr = args.lr, chrom = args.chrom)
     
 '''
 Note:
