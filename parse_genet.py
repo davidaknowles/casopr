@@ -48,7 +48,7 @@ def parse_sumstats(ref_dict, vld_dict, sst_file, n_subj):
 
     comm_snp = vld_snp & ref_snp & sst_snp
 
-    print('... %d common SNPs in the reference, sumstats, and validation set ...' % len(comm_snp))
+    print('Found %d common SNPs in the reference, sumstats, and validation set \n' % len(comm_snp))
     
     n_sqrt = sp.sqrt(n_subj)
     sst_eff = {}
@@ -229,11 +229,11 @@ def parse_anno(anno_file, sst_dict, chrom, prop_nz, flipping=False):
     """
     print('... parse annotations ...')
     t0 = time.time()
-    if anno_file == False:
-        print('Use perfect annotation')
+    if anno_file is False:
+        print('Use perfect annotation \n')
         return simulate.simulate_perfect_anno(sst_dict, prop_nz = prop_nz)
-    elif anno_file == None:
-        print('No annotation used')
+    elif anno_file is None:
+        print('No annotation used \n')
         return(None, None)
     else:
         anno_files = anno_file.split(',') if ',' in anno_file else [anno_file]

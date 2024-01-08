@@ -1,11 +1,11 @@
 #!/bin/bash
-#SBATCH --job-name=dirichlet_dist
+#SBATCH --job-name=normal_dist_bigger_noise
 #SBATCH --partition=pe2
 #SBATCH --nodes=1           # minimum number of nodes to be allocated
 #SBATCH --ntasks=1          # number of tasks
 #SBATCH --cpus-per-task=8   # number of cores on the CPU for the task
 #SBATCH --mem=5G
-#SBATCH --time=64:00:00
+#SBATCH --time=34:00:00
 #SBATCH --output=/gpfs/commons/home/tlin/pic/casioPR/simulation/%x_%j.log
 
 
@@ -21,7 +21,9 @@ all_anno='/gpfs/commons/groups/knowles_lab/data/ADSP_reguloML/annotations/annota
 
 
 
-python test_simulation.py dirichlet_dist_add_noise $bl_anno chr22 0.2 False True --refit_time 20
+#python test_simulation.py normal_dist_add_noise $bl_anno chr22 0.2 False True --refit_time 20
+python test_simulation.py normal_dist_add_bigger_noise False chr22 0.2 False True --refit_time 5
+
 #python test_simulation.py normal_dist $bl_anno chr22 0.2 False True --refit_time 10
 
 

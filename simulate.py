@@ -4,42 +4,38 @@ import torch
 import parse_genet
 
 ## add anno
-def simulate_sumstats(ld_blk, blk_size, n_gwas, p, sst_dict, prop_nz = 0.2, beta_sd = 0.1, sigma_noise = 1., anno_path= False, chrom=22): 
+def simulate_sumstats(ld_blk, blk_size, n_gwas, n_variant, sst_dict, anno_path=None, prop_nz = 0.2, beta_sd = 0.1, sigma_noise = 1., chrom=22, use_sumstat_beta = False, add_noise_perfect_anno=True): 
+    
     sigma_over_sqrt_n = sigma_noise / torch.sqrt(torch.tensor(n_gwas))
-    print('prop_nz = %f'%prop_nz)
-    nz = torch.rand(p) < prop_nz ## filter the snp with p threshold < prop_nz ## creating perfect annotation
+    #print('prop_nz = %f'%prop_nz)
+    nz = torch.rand(n_variant) < prop_nz ## filter the snp with p threshold < prop_nz ## creating perfect annotation
     ## nz: the perfect annotaion (1 for causal, 0 for not); ## should add some noise here too
     
-    sim_beta = True
-    beta_true = torch.where(nz, beta_sd * torch.randn(p), torch.zeros(p)) ## torch.randn = random normal distribution
-    
-    if (True):
-        print('add noise')
-        noise = (2 * torch.rand(p)- 1 )* 0.01
-        nz = nz+noise
+    ## sim beta for every SNP
+    print('... simulating betas...')
+    beta_true = torch.where(nz, beta_sd * torch.randn(n_variant), torch.zeros(n_variant)) ## torch.randn = random normal distribution
     
     ### reading annotations
     if anno_path == False : ## perfect anno
-        print('simulating perfect anno...')
-        if sst_dict.shape[0] > 10000:
-            sim_beta = False
-            print('using real betas from sumstats ...')
+        print('... simulating perfect anno...')
+        if (use_sumstat_beta):  
+            print('... using real betas from sumstats ...')
             beta_true = sst_dict['BETA']
             nz = abs(beta_true) < prop_nz
-            #nz = torch.tensor(nz.values.astype(float)) 
-            annotations = torch.stack([torch.ones(p),nz,torch.randn(p)]).T
-            #print(nz.sum())
-        else:
-            print('simulating betas...')
-            annotations = torch.stack([torch.ones(p),nz,torch.randn(p)]).T # intercept, useful annotation, random annotation
-        
+ 
+        if (add_noise_perfect_anno): ## noise is between -0.1 and 0.1
+            print('... add noise ...')
+            noise = (2 * torch.rand(n_variant)- 1 )* 0.1
+            nz = nz + noise
+
+        annotations = torch.stack([torch.ones(n_variant),nz,torch.randn(n_variant)]).T # intercept, useful annotation, random annotation
         anno_names = ["perfect anno",'random anno']
        
-    else: ## either use anno provided in path, or no anno
-        print('simulating betas...')
+    else: ## either use anno provided in anno_path (can be single, multiple, or none)
         annotations, anno_names = parse_genet.parse_anno(anno_path, sst_dict, chrom = chrom, prop_nz = prop_nz)
-        
-    beta_mrg = torch.zeros(p)
+    
+    
+    beta_mrg = torch.zeros(n_variant)
     mm = 0
     for kk in range(len(ld_blk)):
         idx_blk = torch.arange(mm,mm+blk_size[kk])

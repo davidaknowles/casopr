@@ -105,7 +105,7 @@ def convertr(hyperparam, name, device):
     ) else pyro.sample(name, hyperparam)
 
 
-def model_collapsed(data, sigma_noise = 1., phi_as_prior = False, sqrt_phi = dist.HalfCauchy(1.), desired_min_eig = 1e-6, weight_dist = 'dirict'): 
+def model_collapsed(data, sigma_noise = 1., phi_as_prior = False, sqrt_phi = dist.HalfCauchy(1.), desired_min_eig = 1e-6, weight_dist = 'Normal'): 
     
     device = data.beta_mrg.device
     
@@ -313,6 +313,7 @@ def vi(
     constrain_psi = True, 
     constrain_sigma = False,
     desired_min_eig = 1e-3, 
+    gaussian_anno_weight = True, 
     **opt_kwargs
 ):
     """Variational inference for PRSCS model
@@ -332,6 +333,7 @@ def vi(
         constrain_psi (bool, optional): Constrain psi parameter to [0,1] (default is True).
         constrain_sigma (bool, optional): Constrain sigma_noise parameter to [0,1] (default is False).
         desired_min_eig (float, optional): Desired minimum eigenvalue of LD matrices and covariances (default is 1e-3).
+        gaussian_anno_weight (bool) : The distribution of the annotations. If false, weights will follow dirichlet(defult is Normal distribution).
         **opt_kwargs: Additional keyword arguments for optimization (see `my_optimizer`).
 
     Returns:
