@@ -32,21 +32,20 @@ class Data:
     annotations: torch.Tensor
     torch_type: dict
     
-def sim_anno_weight(num_anno):
-#     num_zero = num_anno//3
-#     zero_indices = torch.randperm(num_anno)[:num_zero]
-#     mask_zero = torch.zeros(num_anno)
-#     mask_zero[zero_indices] = 1.0
-
-#     alpha = torch.ones(num_anno - num_zero)  # Dirichlet distribution parameters
-#     values = pyro.sample("annotations_weights", dist.Dirichlet(alpha).expand([1]).to_event(1))
-#     result = torch.zeros(num_anno)
-#     result[mask_zero.bool()] = 0.0
-#     result[~mask_zero.bool()] = values
-#     return(result)
+def sim_anno_weight(num_anno, path):
+    prior = torch.ones(num_anno) / (num_anno + 1)
+    num_zero = num_anno//3
+    random_positions = torch.randperm(num_anno)[:num_zero]
+    prior[random_positions] = 1e-10
     
-    prior = torch.ones(num_anno + 1) / (num_anno + 1)
-    annotations_weight = pyro.sample("annotations_weight", dist.Dirichlet(prior)).expand([num_anno]).to_event(1) 
+    annotations_weight = pyro.sample("annotation_weights", dist.Dirichlet(prior))
+    #annotations_weight = pyro.sample("annotation_weights", dist.Dirichlet(prior).expand([num_anno]).to_event(1))
+    #sim = torch.stack([prior, annotations_weight]).detach().numpy()
+    
+    #sim_weight = pd.DataFrame({'prior': sim[0], 'weight': sim[1]})
+    #print(annotations_weight)
+#     sim_weight.to_csv(path+'prior.tsv', index = False, sep = '\t')
+
     return(annotations_weight)
     
 
@@ -105,7 +104,7 @@ def convertr(hyperparam, name, device):
     ) else pyro.sample(name, hyperparam)
 
 
-def model_collapsed(data, sigma_noise = 1., phi_as_prior = False, sqrt_phi = dist.HalfCauchy(1.), desired_min_eig = 1e-6, weight_dist = 'Normal'): 
+def model_collapsed(data, path, sigma_noise = 1., phi_as_prior = False, sqrt_phi = dist.HalfCauchy(1.), desired_min_eig = 1e-6, gaussian_anno_weight = True): 
     
     device = data.beta_mrg.device
     
@@ -117,18 +116,18 @@ def model_collapsed(data, sigma_noise = 1., phi_as_prior = False, sqrt_phi = dis
         n_annotations = data.annotations.shape[1] 
         
         ## original one
-        if weight_dist == 'Normal':
+        if gaussian_anno_weight:
             annotation_weights = pyro.sample(
                 "annotation_weights",
                 dist.Normal(zero, one).expand([n_annotations]).to_event(1) 
             )
         else:
         ## simulate weights
-            prior = torch.ones(n_annotations ) / (n_annotations + 1)
-            annotation_weights = pyro.sample("annotation_weights", dist.Dirichlet(prior))
-            #annotation_weights = sim_anno_weight(n_annotations) ## change to simulated weight
-#        
-        
+            # prior = torch.ones(n_annotations) / (n_annotations + 1)
+            # annotation_weights = pyro.sample("annotation_weights", dist.Dirichlet(prior))
+            # print('annotation weight is simulated by dirichlet dist')
+            annotation_weights = sim_anno_weight(n_annotations, path) ## change to simulated weight      
+       
         sqrt_phi = torch.nn.functional.softplus(data.annotations @ annotation_weights) # or exp?
         sqrt_psi = pyro.sample( # constrain < 1? 
             "sqrt_psi",
@@ -314,7 +313,7 @@ def vi(
     constrain_sigma = False,
     desired_min_eig = 1e-3, 
     gaussian_anno_weight = True, 
-    noise_size = 0,
+    path = '/gpfs/commons/home/tlin/pic/casioPR/simulation',
     **opt_kwargs
 ):
     """Variational inference for PRSCS model
@@ -334,7 +333,8 @@ def vi(
         constrain_psi (bool, optional): Constrain psi parameter to [0,1] (default is True).
         constrain_sigma (bool, optional): Constrain sigma_noise parameter to [0,1] (default is False).
         desired_min_eig (float, optional): Desired minimum eigenvalue of LD matrices and covariances (default is 1e-3).
-        gaussian_anno_weight (bool) : The distribution of the annotations. If false, weights will follow dirichlet(defult is Normal distribution).
+        gaussian_anno_weight (bool, optional) : The distribution of the annotations. If false, weights will follow dirichlet(defult is Normal distribution).
+        path(string, optional): The file name + absolute path to saved the simulated weights for the annotations. 
         **opt_kwargs: Additional keyword arguments for optimization (see `my_optimizer`).
 
     Returns:
@@ -369,7 +369,7 @@ def vi(
     one = torch.tensor(1., **torch_type)
     sqrt_phi = dist.HalfCauchy(one) if (phi is None) else np.sqrt(phi).to(**torch_type)
     sigma_noise = dist.HalfCauchy(one) if (sigma_noise is None) else sigma_noise # dist.Gamma(2. * one, 2. * one), dist.InverseGamma(0.001 * one, 0.001 * one)
-    model = lambda dat: model_collapsed(dat, sigma_noise = sigma_noise, phi_as_prior = phi_as_prior, sqrt_phi = sqrt_phi, desired_min_eig = desired_min_eig)       
+    model = lambda dat: model_collapsed(dat, sigma_noise = sigma_noise, phi_as_prior = phi_as_prior, sqrt_phi = sqrt_phi, desired_min_eig = desired_min_eig, gaussian_anno_weight = gaussian_anno_weight, path = path)       
     
     guide = AutoGuideList(model)
     to_expose = []

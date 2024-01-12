@@ -60,6 +60,7 @@ def plot_pearsonr(beta_stats, include_prscs, refit_time, path):
         plt.figure(num=None, figsize=(17, 8))
     else:
         plt.figure()
+        
     pearsonr_list = beta_stats['pearsonR']
     if (include_prscs):
         prscs_r = pearsonr_list[len(pearsonr_list)-1]
@@ -70,20 +71,39 @@ def plot_pearsonr(beta_stats, include_prscs, refit_time, path):
     ax = plt.axes()
     ax.set_ylim(0, 1)
     plt.xticks(list(range(refit_time)),list(range(1,refit_time+1)))
+    plt.xlabel('Iteration')
     plt.title(r'pearson r for est $\beta$ with marginal $\beta$ in every re-fitted model')
     plt.legend(bbox_to_anchor = (0.82, 0.2), loc = 'center') 
+    plt.savefig(path+'betas.pdf',format ='pdf',bbox_inches='tight')
     plt.show()  
     
+def plot_perfect_anno_noise(anno, noise_size, file_name):
+    anno_noise = anno[:,1]
+    perfect = anno_noise > 1 - noise_size
+    plt.plot(anno_noise, marker = '.',label = 'noise added', color = 'cornflowerblue', ls = '')
+    plt.axhline(y = 0, linestyle = '--', color = 'tomato',label = 'Perfect anno') 
+    plt.axhline(y = 1, linestyle = '--', color = 'tomato') 
+    #plt.plot(perfect, marker = '.',label = 'perfect anno',color = 'tomato' ,ls = '', alpha = 0.3)
+    plt.ylabel('perfect_anno_value')
+    plt.legend()
+    plt.title('noise = $\pm$ %s'%noise_size)
+    plt.savefig(file_name + 'perfect_anno_noise.pdf' ,format ='pdf',bbox_inches='tight')
+    
+    fig, ax = plt.subplots(figsize=(8, 2))
+    ax.boxplot([anno_noise[perfect]], vert=False, widths=0.3 )
+    ax.boxplot([anno_noise[~perfect]],vert=False, widths=0.3 )
+    ax.set_yticks([])
+    ax.set_ylabel('perfect_anno + noise')
+    plt.title('noise = $\pm$ %s'%noise_size)
+    plt.savefig(file_name + 'perfect_anno_noise_box.pdf' ,format ='pdf',bbox_inches='tight')
 
-def check_sim_result(save_fig_name, anno_path, test, gaussian_anno_weight=True, noise_size = 0, refit_time = 10,prop_nz = 0.2, phi_as_prior = False, constrain_sigma = True, lr = 0.03, chrom=22, run_prscs = True):
+def check_sim_result(save_fig_name, anno_path, test, gaussian_anno_weight = True, noise_size = 0, refit_time = 10,prop_nz = 0.2, phi_as_prior = False, constrain_sigma = True, lr = 0.03, chrom=22, run_prscs = True):
     ## initializing
-
     chr_dict =  {
         'bim_prefix' : "test_data/ADSP_qc_chr%s"%chrom,
         'sst_file' : "test_data/wightman_chr%s.tsv"%chrom,
         'n_gwas' : 762971
     }
-
     sim_dict = {
         'bim_prefix' : "test_data/test",
         'sst_file' : "test_data/sumstats.txt",
@@ -112,7 +132,7 @@ def check_sim_result(save_fig_name, anno_path, test, gaussian_anno_weight=True, 
         
     ## handling the pic saving repo
     path = get_name(save_fig_name, refit_time)
-    print("fig will be saved in %s"%path)
+    print("Figs will be saved in %s "%path)
     
     ## start the function
     if '1kg' in os.path.basename(param_dict['ref_dir']):
@@ -126,47 +146,50 @@ def check_sim_result(save_fig_name, anno_path, test, gaussian_anno_weight=True, 
     sst_dict = parse_genet.parse_sumstats(ref_df, vld_df, param_dict['sst_file'], param_dict['n_gwas'])
     ld_blk, ld_blk_sym, blk_size = parse_genet.parse_ldblk(param_dict['ref_dir'], sst_dict, chrom)
     print("There are %s ld_block. \n" %(len(ld_blk)))
-    beta_true, beta_mrg, annotations, anno_names = simulate.simulate_sumstats(ld_blk, blk_size, param_dict['n_gwas'], len(sst_dict), sst_dict,anno_path = anno_path, chrom=chrom,prop_nz = prop_nz)
+    beta_true, beta_mrg, annotations, anno_names = simulate.simulate_sumstats(ld_blk, blk_size, param_dict['n_gwas'], len(sst_dict), sst_dict,anno_path = anno_path, chrom=chrom,prop_nz = prop_nz, noise_size = noise_size)
     
     sst_dict["BETA"] = beta_mrg
  
     if anno_path != None:
         anno_names.insert(0,'intercept')    
-
+    if anno_path == False:
+        plot_perfect_anno_noise(annotations, noise_size, path)
+    
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+    
     print("... start VI...")
-
+    plt.figure()
     anno_list=pd.DataFrame()
     betas = pd.DataFrame({'beta_true':beta_true, 'beta_marginal':beta_mrg})
-    #for i in range(refit_time):
     for i in tqdm(range(refit_time)):
         print('Re-train the model %d time(s)'% (i+1))
-        losses, beta, phi_est, stats =  vi.vi(sst_dict, param_dict['n_gwas'], ld_blk, blk_size, device = device, annotations = annotations, max_iterations = param_dict['n_iter'], max_particles=4, desired_min_eig = 1e-3, min_iterations = 200, stall_window = 30, phi_as_prior = phi_as_prior, lr = lr, constrain_sigma = constrain_sigma,
-        gaussian_anno_weight = gaussian_anno_weight, noise_size = noise_size)
+        losses, beta, phi_est, stats =  vi.vi(sst_dict, param_dict['n_gwas'], ld_blk, blk_size, device = device, annotations = annotations, max_iterations = param_dict['n_iter'], max_particles=4, desired_min_eig = 1e-3, min_iterations = 200, stall_window = 30, phi_as_prior = phi_as_prior, lr = lr, constrain_sigma = constrain_sigma, gaussian_anno_weight = gaussian_anno_weight, path = path)
         column_name = f'beta_casioPR_{i + 1}'
         betas[column_name] = beta
         plt.plot(losses);plt.title('losses')
         
         if anno_path != None:
-            anno_df = pd.DataFrame.from_dict(stats["annotation_weights"] )
+            anno_df = pd.DataFrame.from_dict(stats["annotation_weights"])
             anno_list = anno_list.append(anno_df["mean"].to_frame().T, ignore_index=True) 
         if i == refit_time-1:
             plt.savefig(path+'loss.pdf',format ='pdf',bbox_inches='tight'); plt.show()
     
-    if (run_prscs == True):
+    if (run_prscs):
         beta_prscs = mcmc_gtb.mcmc(1, 0.5, None, sst_dict, param_dict['n_gwas'], ld_blk, blk_size, param_dict['n_iter'], 500, 5, int(chrom), path, False, 42)
         betas['beta_prscs'] = beta_prscs.flatten()
     
     ##  save beta
     print('saving beta')
     betas.to_csv(path+'betas.tsv', sep = '\t', index = False)
-    
-    # print('saving sim_anno_weight')
-    # anno_weight_sim.to_csv(path+'anno_weight_sim.tsv', sep = '\t', index = False)
+
     
     ## get pearson, MSE, and mannwhitney U test 
     beta_stats = get_beta_stats(betas)
     beta_stats.to_csv(path+'betas_stat.tsv', sep = '\t', index = False)
+    
+    ##  plot pearson r between the marginal beta and betea of PRSCS/CasioPR 
+    plot_pearsonr(beta_stats, run_prscs, refit_time, path)
+         
 
     ##  check anno_weight (only when annotation exist)
     if anno_path != None:
@@ -174,36 +197,31 @@ def check_sim_result(save_fig_name, anno_path, test, gaussian_anno_weight=True, 
         plt.figure()
         plt.bar(anno_list.mean().index, anno_list.mean(), yerr=anno_list.std(), capsize=3, color='turquoise')
         plt.xticks(anno_list.mean().index, anno_names, rotation=90)
-        plt.ylabel('weight')
-        plt.title('iterate %d times'%(refit_time))
+        plt.axhline(y = 0, linestyle = '--', color = 'darkgrey') 
+        plt.ylabel('weight'); plt.title('iterate %d times'%(refit_time))
         plt.savefig(path+'anno_weight.pdf',format ='pdf',bbox_inches='tight');plt.show()
         print('anno_weight')
         print(anno_list)
         
         ## only_for_perfect_anno
-        if anno_path == False:       
-            print('here')
-            plt.figure()
-            correlation = anno_list.iloc[:][1].corr(anno_list.iloc[:][2])
-            sns.regplot(anno_list.iloc[:][1],anno_list.iloc[:][2], ci=None,marker="p", color="b", line_kws=dict(color="r", alpha = 0.5))
-            plt.text(anno_list.iloc[:][1].mean(), anno_list.iloc[:][2].mean(), f'Correlation: {correlation:.2f}', fontsize=12, color='blue', va='top',ha='center')
-            # plt.plot(anno_list.iloc[:][1],anno_list.iloc[:][2], marker='X', linestyle='None', color='y')
-            plt.xlabel('perfect anno')
-            plt.ylabel('random anno')
-            plt.title('annotation weights')
-            plt.savefig(path+'anno_weight_scatter.pdf',format ='pdf');plt.show()   
-        
-    ##  plot pearson r between the marginal beta and betea of PRSCS/CasioPR 
-    plot_pearsonr(beta_stats, run_prscs, refit_time, path)
-    return(anno_list,betas)        
-
+       
+            # plt.figure()
+            # correlation = anno_list.iloc[:][1].corr(anno_list.iloc[:][2])
+            # sns.regplot(anno_list.iloc[:][1],anno_list.iloc[:][2], ci=None,marker="p", color="b", line_kws=dict(color="r", alpha = 0.5))
+            # plt.text(anno_list.iloc[:][1].mean(), anno_list.iloc[:][2].mean(), f'Correlation: {correlation:.2f}', fontsize=12, color='blue', va='top',ha='center')
+            # # plt.plot(anno_list.iloc[:][1],anno_list.iloc[:][2], marker='X', linestyle='None', color='y')
+            # plt.xlabel('perfect anno')
+            # plt.ylabel('random anno')
+            # plt.title('annotation weights')
+            # plt.savefig(path+'anno_weight_scatter.pdf',format ='pdf');plt.show()   
+    return(anno_list,betas)   
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Run simulation")
     parser.add_argument("--save_fig_name", type=str, default = 'test', help="Save figure name")
     parser.add_argument("--anno_path", type=str, default = None, help="Annotation path")
     parser.add_argument("--test_on", type=str, default = 'sim', help="chr22 or sim")
-    parser.add_argument("--gaussian_anno_weight", type=bool, default = 'True', help="gaussian or dirichlet anno weights")
+    parser.add_argument("--gaussian_anno_weight", type=bool, default = False, help="gaussian or dirichlet anno weights")
     parser.add_argument("--noise_size", type=float, default = 0.1)
     parser.add_argument("--refit_time", type=int, default=10, help="Refit time (default: 20)")
     parser.add_argument("--lr", type=float, default=0.03, help="Learning rate (default: 0.03)")

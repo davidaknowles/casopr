@@ -4,7 +4,7 @@ import torch
 import parse_genet
 
 ## add anno
-def simulate_sumstats(ld_blk, blk_size, n_gwas, n_variant, sst_dict, anno_path=None, prop_nz = 0.2, beta_sd = 0.1, sigma_noise = 1., chrom=22, use_sumstat_beta = False, add_noise_perfect_anno=True): 
+def simulate_sumstats(ld_blk, blk_size, n_gwas, n_variant, sst_dict, anno_path=None, prop_nz = 0.2, beta_sd = 0.1, sigma_noise = 1., chrom=22, use_sumstat_beta = False, add_noise_perfect_anno=True, noise_size = 0.1): 
     
     sigma_over_sqrt_n = sigma_noise / torch.sqrt(torch.tensor(n_gwas))
     #print('prop_nz = %f'%prop_nz)
@@ -24,8 +24,8 @@ def simulate_sumstats(ld_blk, blk_size, n_gwas, n_variant, sst_dict, anno_path=N
             nz = abs(beta_true) < prop_nz
  
         if (add_noise_perfect_anno): ## noise is between -0.1 and 0.1
-            print('... add noise ...')
-            noise = (2 * torch.rand(n_variant)- 1 )* 0.1
+            print('... add noise between +- %s for the perfect anno ...'% noise_size)
+            noise = (2 * torch.rand(n_variant)- 1 )* noise_size
             nz = nz + noise
 
         annotations = torch.stack([torch.ones(n_variant),nz,torch.randn(n_variant)]).T # intercept, useful annotation, random annotation

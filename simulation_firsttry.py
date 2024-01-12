@@ -62,12 +62,11 @@ losses, beta, phi_est, stats = vi.vi(sst_dict, param_dict['n_gwas'], ld_blk, blk
 # Does constrain_sigma help? I think constrain_psi does. 
 # Seem to need desired_min_eig=1e-3 at least to avoid numerical issues. Could go lower if using float64 it seemed. 
 
-plt.plot(losses); plt.show()
-
+plt.plot(losses)
 plt.scatter(beta_true, beta)
 plt.xlabel("True beta")
 plt.ylabel("Infered beta")
-plt.title("Pearson R=%1.3f" % scipy.stats.pearsonr(beta_true,beta)[0] )
+plt.title("Pearson R=%1.3f" % scipy.stats.pearsonr(beta_true,beta)[0])
 
 stats["annotation_weights"] # ideally should show large positive value for second entry, and close to 0 for third (noise)
 
