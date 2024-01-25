@@ -32,22 +32,6 @@ class Data:
     annotations: torch.Tensor
     torch_type: dict
     
-def sim_anno_weight(num_anno, path):
-    prior = torch.ones(num_anno) / (num_anno + 1)
-    num_zero = num_anno//3
-    random_positions = torch.randperm(num_anno)[:num_zero]
-    prior[random_positions] = 1e-10
-    
-    annotations_weight = pyro.sample("annotation_weights", dist.Dirichlet(prior))
-    #annotations_weight = pyro.sample("annotation_weights", dist.Dirichlet(prior).expand([num_anno]).to_event(1))
-    #sim = torch.stack([prior, annotations_weight]).detach().numpy()
-    
-    #sim_weight = pd.DataFrame({'prior': sim[0], 'weight': sim[1]})
-    #print(annotations_weight)
-#     sim_weight.to_csv(path+'prior.tsv', index = False, sep = '\t')
-
-    return(annotations_weight)
-    
 
 def get_posterior_stats(
     model,
@@ -67,7 +51,6 @@ def get_posterior_stats(
         num_samples=num_samples) 
     
     samples = predictive(data) ## get posterior samples
-    
     samples["beta"] = torch.zeros(num_samples,data.p,**data.torch_type)
     
     ## phi is the global scaling, psi is the local one.
@@ -121,12 +104,13 @@ def model_collapsed(data, path, sigma_noise = 1., phi_as_prior = False, sqrt_phi
                 "annotation_weights",
                 dist.Normal(zero, one).expand([n_annotations]).to_event(1) 
             )
-        else:
-        ## simulate weights
-            # prior = torch.ones(n_annotations) / (n_annotations + 1)
-            # annotation_weights = pyro.sample("annotation_weights", dist.Dirichlet(prior))
-            # print('annotation weight is simulated by dirichlet dist')
-            annotation_weights = sim_anno_weight(n_annotations, path) ## change to simulated weight      
+        else:  
+            prior = torch.ones(n_annotations) / (n_annotations + 1)
+            n_zero = n_annotations//3
+            random_positions = torch.randperm(n_annotations)[:n_zero]
+            prior[random_positions] = 1e-10
+            annotation_weights = pyro.sample("annotation_weights", dist.Dirichlet(prior))
+            
        
         sqrt_phi = torch.nn.functional.softplus(data.annotations @ annotation_weights) # or exp?
         sqrt_psi = pyro.sample( # constrain < 1? 
@@ -190,9 +174,8 @@ def model_collapsed(data, path, sigma_noise = 1., phi_as_prior = False, sqrt_phi
                 scale_tril = chol_cov * sigma_over_sqrt_n
             ), 
             obs = data.beta_mrg[idx_blk])
-        
+    
         mm += data.blk_size[kk]
-       
     
 
         

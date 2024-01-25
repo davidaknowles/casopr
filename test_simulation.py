@@ -76,26 +76,6 @@ def plot_pearsonr(beta_stats, include_prscs, refit_time, path):
     plt.legend(bbox_to_anchor = (0.82, 0.2), loc = 'center') 
     plt.savefig(path+'betas.pdf',format ='pdf',bbox_inches='tight')
     plt.show()  
-    
-def plot_perfect_anno_noise(anno, noise_size, file_name):
-    anno_noise = anno[:,1]
-    perfect = anno_noise > 1 - noise_size
-    plt.plot(anno_noise, marker = '.',label = 'noise added', color = 'cornflowerblue', ls = '')
-    plt.axhline(y = 0, linestyle = '--', color = 'tomato',label = 'Perfect anno') 
-    plt.axhline(y = 1, linestyle = '--', color = 'tomato') 
-    #plt.plot(perfect, marker = '.',label = 'perfect anno',color = 'tomato' ,ls = '', alpha = 0.3)
-    plt.ylabel('perfect_anno_value')
-    plt.legend()
-    plt.title('noise = $\pm$ %s'%noise_size)
-    plt.savefig(file_name + 'perfect_anno_noise.pdf' ,format ='pdf',bbox_inches='tight')
-    
-    fig, ax = plt.subplots(figsize=(8, 2))
-    ax.boxplot([anno_noise[perfect]], vert=False, widths=0.3 )
-    ax.boxplot([anno_noise[~perfect]],vert=False, widths=0.3 )
-    ax.set_yticks([])
-    ax.set_ylabel('perfect_anno + noise')
-    plt.title('noise = $\pm$ %s'%noise_size)
-    plt.savefig(file_name + 'perfect_anno_noise_box.pdf' ,format ='pdf',bbox_inches='tight')
 
 def check_sim_result(save_fig_name, anno_path, test, gaussian_anno_weight = True, noise_size = 0, refit_time = 10,prop_nz = 0.2, phi_as_prior = False, constrain_sigma = True, lr = 0.03, chrom=22, run_prscs = True):
     ## initializing
@@ -146,14 +126,12 @@ def check_sim_result(save_fig_name, anno_path, test, gaussian_anno_weight = True
     sst_dict = parse_genet.parse_sumstats(ref_df, vld_df, param_dict['sst_file'], param_dict['n_gwas'])
     ld_blk, ld_blk_sym, blk_size = parse_genet.parse_ldblk(param_dict['ref_dir'], sst_dict, chrom)
     print("There are %s ld_block. \n" %(len(ld_blk)))
-    beta_true, beta_mrg, annotations, anno_names = simulate.simulate_sumstats(ld_blk, blk_size, param_dict['n_gwas'], len(sst_dict), sst_dict,anno_path = anno_path, chrom=chrom,prop_nz = prop_nz, noise_size = noise_size)
+    beta_true, beta_mrg, annotations, anno_names = simulate.simulate_sumstats(ld_blk, blk_size, param_dict['n_gwas'], len(sst_dict), sst_dict, path, anno_path = anno_path, chrom=chrom,prop_nz = prop_nz, noise_size = noise_size)
     
     sst_dict["BETA"] = beta_mrg
  
     if anno_path != None:
         anno_names.insert(0,'intercept')    
-    if anno_path == False:
-        plot_perfect_anno_noise(annotations, noise_size, path)
     
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     
