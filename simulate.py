@@ -25,14 +25,13 @@ def plot_perfect_anno_noise(noise, perfect, noise_size, path):
         for box in boxplot['boxes']:
             box.set(facecolor=color)
     
-    print(path + 'perfect_anno_noise.pdf')
     fig.suptitle('noise = $\pm$ %s' % noise_size, size = 15)
     fig.savefig(path + 'perfect_anno_noise.pdf' ,format ='pdf',bbox_inches='tight')
     plt.show()
     
     
 ## add anno
-def simulate_sumstats(ld_blk, blk_size, n_gwas, n_variant, sst_dict, path, anno_path=None, prop_nz = 0.2, beta_sd = 0.1, sigma_noise = 1., chrom=22, use_sumstat_beta = False, add_noise_perfect_anno=True, noise_size = 0.1): 
+def simulate_sumstats(ld_blk, blk_size, n_gwas, n_variant, sst_dict, path, anno_path=None, prop_nz = 0.2, beta_sd = 0.1, sigma_noise = 1., chrom=22, use_sumstat_beta = False,  noise_size = 0.1): 
     
     sigma_over_sqrt_n = sigma_noise / torch.sqrt(torch.tensor(n_gwas))
     #print('prop_nz = %f'%prop_nz)
@@ -51,13 +50,13 @@ def simulate_sumstats(ld_blk, blk_size, n_gwas, n_variant, sst_dict, path, anno_
             beta_true = sst_dict['BETA']
             nz = abs(beta_true) < prop_nz
  
-        if (add_noise_perfect_anno): ## noise is between -0.1 and 0.1
-            print('... add noise between +- %s for the perfect anno ...'% noise_size)
-            noise = (2 * torch.rand(n_variant)- 1 )* noise_size
-            perfect = nz
-            nz = nz + noise
-            plot_perfect_anno_noise(nz,perfect, noise_size, path)
-            
+
+        print('... add noise between +- %s for the perfect anno ...'% noise_size)
+        noise = (2 * torch.rand(n_variant)- 1 )* noise_size
+        perfect = nz
+        nz = nz + noise
+        plot_perfect_anno_noise(nz,perfect, noise_size, path)
+
         annotations = torch.stack([torch.ones(n_variant),nz,torch.randn(n_variant)]).T # intercept, useful annotation, random annotation
         anno_names = ["perfect anno",'random anno']
        

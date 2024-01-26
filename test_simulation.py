@@ -79,11 +79,19 @@ def plot_pearsonr(beta_stats, include_prscs, refit_time, path):
 
 def check_sim_result(save_fig_name, anno_path, test, gaussian_anno_weight = True, noise_size = 0, refit_time = 10,prop_nz = 0.2, phi_as_prior = False, constrain_sigma = True, lr = 0.03, chrom=22, run_prscs = True):
     ## initializing
-    chr_dict =  {
-        'bim_prefix' : "test_data/ADSP_qc_chr%s"%chrom,
-        'sst_file' : "test_data/wightman_chr%s.tsv"%chrom,
-        'n_gwas' : 762971
+    # chr_dict =  {
+    #     'bim_prefix' : "test_data/ADSP_qc_chr%s"%chrom,
+    #     'sst_file' : "test_data/wightman_chr%s.tsv"%chrom,
+    #     'n_gwas' : 762971
+    # }
+    
+    chr_dict = {
+    'ref_dir' : '/gpfs/commons/groups/knowles_lab/data/ADSP_reguloML/LD_PRScs/ldblk_ukbb_eur', ## add my path
+    'bim_prefix' : '/gpfs/commons/groups/knowles_lab/data/ADSP_reguloML/ADSP_vcf/17K_final/annotated_filtered_hg37/plink/vcf_filt/ADSP_annotated_chr%s'%chrom,
+    'sst_file' : '/gpfs/commons/groups/knowles_lab/data/ADSP_reguloML/summary_stats/alzheimers/fixed_alzheimers/processed/wightman_fixed_beta_qc.tsv',
+    'n_gwas' : 762971
     }
+    
     sim_dict = {
         'bim_prefix' : "test_data/test",
         'sst_file' : "test_data/sumstats.txt",
