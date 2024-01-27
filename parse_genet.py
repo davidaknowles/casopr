@@ -122,7 +122,7 @@ def parse_sumstats(ref_dict, vld_dict, sst_file, n_subj):
 
 
 def parse_ldblk(ldblk_dir, sst_dict, chrom):
-    #print('... parse reference LD on chromosome %s ...' % chrom)
+    print('... parse reference LD on chromosome %s ...' % chrom)
 
     if '1kg' in os.path.basename(ldblk_dir):
         chr_name = ldblk_dir + '/ldblk_1kg_chr' + str(chrom) + '.hdf5'

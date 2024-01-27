@@ -2,9 +2,36 @@ import numpy as np
 import pyro.distributions as dist
 import torch
 import parse_genet
+import matplotlib.pyplot as plt
 
+
+def plot_perfect_anno_noise(noise, perfect, noise_size, path):
+    fig, ax = plt.subplots(1,2, figsize=(8, 8))
+    
+    true_count = torch.sum(perfect).item()
+    labels = ['True', 'False']
+    counts = [true_count, len(perfect) - true_count]
+    
+    ax[0].bar(labels, counts, color=['dodgerblue', 'tomato'])
+    ax[0].set_ylabel('Count')
+    for i, count in enumerate(counts):
+        ax[0].text(i, count , str(count), ha='center', va='bottom')
+        
+    box1 = ax[1].boxplot([noise[perfect]], positions=[0],  widths=0.3, patch_artist=True, notch=True)
+    box2 = ax[1].boxplot([noise[~perfect]], positions=[0.4], widths=0.3, patch_artist=True,notch=True)
+    ax[1].set_xticklabels(["True","False"])
+    colors = ['dodgerblue', 'tomato']
+    for boxplot, color in zip([box1, box2], colors):
+        for box in boxplot['boxes']:
+            box.set(facecolor=color)
+    
+    fig.suptitle('noise = $\pm$ %s' % noise_size, size = 15)
+    fig.savefig(path + 'perfect_anno_noise.pdf' ,format ='pdf',bbox_inches='tight')
+    plt.show()
+    
+    
 ## add anno
-def simulate_sumstats(ld_blk, blk_size, n_gwas, n_variant, sst_dict, anno_path=None, prop_nz = 0.2, beta_sd = 0.1, sigma_noise = 1., chrom=22, use_sumstat_beta = False, add_noise_perfect_anno=True, noise_size = 0.1): 
+def simulate_sumstats(ld_blk, blk_size, n_gwas, n_variant, sst_dict, path, anno_path=None, prop_nz = 0.2, beta_sd = 0.1, sigma_noise = 1., chrom=22, use_sumstat_beta = False,  noise_size = 0.1): 
     
     sigma_over_sqrt_n = sigma_noise / torch.sqrt(torch.tensor(n_gwas))
     #print('prop_nz = %f'%prop_nz)
@@ -23,17 +50,20 @@ def simulate_sumstats(ld_blk, blk_size, n_gwas, n_variant, sst_dict, anno_path=N
             beta_true = sst_dict['BETA']
             nz = abs(beta_true) < prop_nz
  
-        if (add_noise_perfect_anno): ## noise is between -0.1 and 0.1
-            print('... add noise between +- %s for the perfect anno ...'% noise_size)
-            noise = (2 * torch.rand(n_variant)- 1 )* noise_size
-            nz = nz + noise
+
+        print('... add noise between +- %s for the perfect anno ...'% noise_size)
+        noise = (2 * torch.rand(n_variant)- 1 )* noise_size
+        perfect = nz
+        nz = nz + noise
+        plot_perfect_anno_noise(nz,perfect, noise_size, path)
 
         annotations = torch.stack([torch.ones(n_variant),nz,torch.randn(n_variant)]).T # intercept, useful annotation, random annotation
         anno_names = ["perfect anno",'random anno']
        
     else: ## either use anno provided in anno_path (can be single, multiple, or none)
         annotations, anno_names = parse_genet.parse_anno(anno_path, sst_dict, chrom = chrom, prop_nz = prop_nz)
-    
+        annotation_weights = torch.randn(len(anno_names))
+
     
     beta_mrg = torch.zeros(n_variant)
     mm = 0
@@ -43,7 +73,7 @@ def simulate_sumstats(ld_blk, blk_size, n_gwas, n_variant, sst_dict, anno_path=N
         L, V = torch.linalg.eigh(ld_torch)
         L[L < 0.] = 0.
 
-        beta_mrg[idx_blk] = ld_torch @ beta_true[idx_blk] + sigma_over_sqrt_n * (V @ torch.diag(L.sqrt())) @ torch.randn(blk_size[kk])
+        beta_mrg[idx_blk] = ld_torch @ beta_true[idx_blk]  + sigma_over_sqrt_n * (V @ torch.diag(L.sqrt())) @ torch.randn(blk_size[kk])
         #ld_torch @ beta_true[idx_blk], 
         # covariance_matrix = ld_torch * sigma_over_sqrt_n**2).rsample()
         mm += blk_size[kk]
