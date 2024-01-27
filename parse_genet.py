@@ -25,7 +25,6 @@ def parse_bim(bim_file):
     
     return pd.read_csv(bim_file, sep="\t", names = ["CHR", "SNP", "huh", "pos", "A1", "A2"], usecols = ["CHR", "SNP", "A1", "A2"])
 
-
 def parse_sumstats(ref_dict, vld_dict, sst_file, n_subj):
     print('... parse sumstats file: %s ...' % sst_file)
 
@@ -220,7 +219,7 @@ def parse_ldblk_test(ldblk_dir, sst_dict, chrom, sim=False):
 
 
 
-def parse_anno(anno_file, sst_dict, chrom, prop_nz, flipping=False):
+def parse_anno(anno_file, sst_dict, chrom, flipping=False):
     """
     If no annotation is fed(anno_file = False), will simulate perfect annotations defined in simulate.py
     
@@ -229,10 +228,7 @@ def parse_anno(anno_file, sst_dict, chrom, prop_nz, flipping=False):
     """
     print('... parse annotations ...')
     t0 = time.time()
-    if anno_file is False:
-        print('Use perfect annotation \n')
-        return simulate.simulate_perfect_anno(sst_dict, prop_nz = prop_nz)
-    elif anno_file is None:
+    if anno_file is None:
         print('No annotation used \n')
         return(None, None)
     else:
@@ -259,7 +255,7 @@ def parse_anno(anno_file, sst_dict, chrom, prop_nz, flipping=False):
         print("Successfully loaded %d annotations for %d SNPs" %(anno_df.shape[1]-5, anno_df.shape[0]))
 
         anno_merge = sst_dict[['SNP','A1','A2']].merge(anno_df, on = 'SNP', suffixes=('', '_y')) 
-        print('Total of %d SNPs left after merging with sst'%(anno_merge.shape[0]))
+        print('Total of %d SNPs left after merging with sumstat'%(anno_merge.shape[0]))
 
         ## flipping annotations if A1,A2 is opposite with the sst (default is false)
         if flipping:
