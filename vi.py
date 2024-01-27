@@ -337,7 +337,7 @@ def vi(
     ld_fix, ld_blk_chol = preprocess_ld(ld_blk, blk_size, desired_min_eig = desired_min_eig, torch_type = torch_type)
     
     data = Data(
-        beta_mrg = torch.tensor(sst_df['BETA'], **torch_type),
+        beta_mrg = torch.tensor(sst_df['BETA'].values, **torch_type),
         p = len(sst_df['SNP']), # number of SNPs
         n = n, 
         ld_blk = ld_fix, 

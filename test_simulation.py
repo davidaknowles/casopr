@@ -77,7 +77,18 @@ def plot_pearsonr(beta_stats, include_prscs, refit_time, path):
     plt.savefig(path+'betas.pdf',format ='pdf',bbox_inches='tight')
     plt.show()  
 
-def check_sim_result(save_fig_name, anno_path, test, gaussian_anno_weight = True, noise_size = 0, refit_time = 10,prop_nz = 0.2, phi_as_prior = False, constrain_sigma = True, lr = 0.03, chrom=22, run_prscs = True):
+def load_data(chrom,ref_df,  path, anno_path, prop_nz,noise_size, bim_prefix, sst_file_name , n_gwas, ref_dir):
+    ref_df = ref_df[ref_df.CHR == chrom]
+    # vld_df = parse_genet.parse_bim(bim_prefix + ".bim")
+    # vld_df = vld_df[vld_df.CHR == chrom]
+    vld_df = parse_genet.parse_bim(bim_prefix + "%s.bim"%chrom)
+    sst_dict = parse_genet.parse_sumstats(ref_df, vld_df, sst_file_name, n_gwas)
+    ld_blk, ld_blk_sym, blk_size = parse_genet.parse_ldblk(ref_dir, sst_dict, chrom)
+    print("There are %s ld_block. in chr%s\n" %(len(ld_blk),chrom))
+    beta_true, beta_mrg, annotations, anno_names = simulate.simulate_sumstats(ld_blk, blk_size, n_gwas, len(sst_dict), sst_dict, path, anno_path = anno_path, chrom=chrom,prop_nz = prop_nz, noise_size = noise_size)
+    return ref_df, vld_df, sst_dict, ld_blk, ld_blk_sym, blk_size, beta_true, beta_mrg, annotations, anno_names
+
+def check_sim_result(save_fig_name, anno_path, test, gaussian_anno_weight = True, noise_size = 0, refit_time = 10,prop_nz = 0.2, phi_as_prior = False, constrain_sigma = True, lr = 0.03, chrom=range(20,23), run_prscs = False):
     ## initializing
     # chr_dict =  {
     #     'bim_prefix' : "test_data/ADSP_qc_chr%s"%chrom,
@@ -87,8 +98,8 @@ def check_sim_result(save_fig_name, anno_path, test, gaussian_anno_weight = True
     
     chr_dict = {
     'ref_dir' : '/gpfs/commons/groups/knowles_lab/data/ADSP_reguloML/LD_PRScs/ldblk_ukbb_eur', ## add my path
-    'bim_prefix' : '/gpfs/commons/groups/knowles_lab/data/ADSP_reguloML/ADSP_vcf/17K_final/annotated_filtered_hg37/plink/vcf_filt/ADSP_annotated_chr%s'%chrom,
-    'sst_file' : '/gpfs/commons/groups/knowles_lab/data/ADSP_reguloML/summary_stats/alzheimers/fixed_alzheimers/processed/wightman_fixed_beta_qc.tsv',
+    'bim_prefix' : '/gpfs/commons/groups/knowles_lab/data/ADSP_reguloML/ADSP_vcf/17K_final/annotated_filtered_hg37/plink/vcf_filt/ADSP_annotated_chr',
+    'sst_file' : 'test_data/wightman4prscs.tsv',
     'n_gwas' : 762971
     }
     
@@ -104,7 +115,6 @@ def check_sim_result(save_fig_name, anno_path, test, gaussian_anno_weight = True
      
     else:
         param_dict = chr_dict
-        print('running on chr%s'%chrom)
         
     param_dict['ref_dir']='/gpfs/commons/groups/knowles_lab/data/ADSP_reguloML/LD_PRScs/ldblk_ukbb_eur'
     param_dict['n_iter'] = 1000
@@ -127,19 +137,40 @@ def check_sim_result(save_fig_name, anno_path, test, gaussian_anno_weight = True
         ref_df = parse_genet.parse_ref(param_dict['ref_dir'] + '/snpinfo_1kg_hm3')
     elif 'ukbb' in os.path.basename(param_dict['ref_dir']):
         ref_df = parse_genet.parse_ref(param_dict['ref_dir'] + '/snpinfo_ukbb_hm3')
-
-    ref_df = ref_df[ref_df.CHR == chrom]
-    vld_df = parse_genet.parse_bim(param_dict['bim_prefix'] + ".bim")
-    vld_df = vld_df[vld_df.CHR == chrom]
-    sst_dict = parse_genet.parse_sumstats(ref_df, vld_df, param_dict['sst_file'], param_dict['n_gwas'])
-    ld_blk, ld_blk_sym, blk_size = parse_genet.parse_ldblk(param_dict['ref_dir'], sst_dict, chrom)
-    print("There are %s ld_block. \n" %(len(ld_blk)))
-    beta_true, beta_mrg, annotations, anno_names = simulate.simulate_sumstats(ld_blk, blk_size, param_dict['n_gwas'], len(sst_dict), sst_dict, path, anno_path = anno_path, chrom=chrom,prop_nz = prop_nz, noise_size = noise_size)
     
+    if (isinstance(chrom, int)):
+        print('running on chr%s'%chrom)
+        ref_df, vld_df, sst_dict, ld_blk, ld_blk_sym, blk_size, beta_true, beta_mrg, annotations, anno_names = load_data(chrom,ref_df, path,anno_path, prop_nz, noise_size, param_dict['bim_prefix'], param_dict['sst_file'],param_dict['n_gwas'],param_dict['ref_dir'] )
+        # ref_df = ref_df[ref_df.CHR == chrom]
+        # vld_df = parse_genet.parse_bim(param_dict['bim_prefix'] + ".bim")
+        # vld_df = vld_df[vld_df.CHR == chrom]
+        # sst_dict = parse_genet.parse_sumstats(ref_df, vld_df, param_dict['sst_file'], param_dict['n_gwas'])
+        # ld_blk, ld_blk_sym, blk_size = parse_genet.parse_ldblk(param_dict['ref_dir'], sst_dict, chrom)
+        # print("There are %s ld_block. in chr%s\n" %(len(ld_blk),i))
+        # beta_true, beta_mrg, annotations, anno_names = simulate.simulate_sumstats(ld_blk, blk_size, param_dict['n_gwas'], len(sst_dict), sst_dict, path, anno_path = anno_path, chrom=chrom,prop_nz = prop_nz, noise_size = noise_size)
+    else:
+        ld_blk, ld_blk_sym, blk_size = [],[],[]
+        annotations, beta_true, beta_mrg = torch.tensor([]), torch.tensor([]), torch.tensor([])
+        sst_dict = pd.DataFrame()
+        
+        for i in tqdm(chrom):
+            print('running on chr%s'%i)
+            ref_df_chr, vld_df_chr, sst_dict_chr, ld_blk_chr, ld_blk_sym_chr, blk_size_chr, beta_true_chr, beta_mrg_chr, annotations_chr, anno_names = load_data(i, ref_df,path, anno_path, prop_nz, noise_size, param_dict['bim_prefix'], param_dict['sst_file'],param_dict['n_gwas'],param_dict['ref_dir'])
+            
+            ld_blk = ld_blk + ld_blk_chr
+            ld_blk_sym = ld_blk_sym + ld_blk_sym_chr
+            blk_size = blk_size+ blk_size_chr
+            annotations = torch.cat((annotations,annotations_chr))
+            beta_true = torch.cat((beta_true, beta_true_chr))
+            beta_mrg = torch.cat((beta_mrg, beta_mrg_chr))
+            sst_dict = pd.concat([sst_dict, sst_dict_chr])
+
     sst_dict["BETA"] = beta_mrg
- 
+    
     if anno_path != None:
         anno_names.insert(0,'intercept')    
+        
+    return ld_blk,ld_blk_sym,blk_size,annotations,beta_true,beta_mrg, sst_dict,anno_names
     
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     
