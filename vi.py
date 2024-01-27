@@ -32,12 +32,29 @@ class Data:
     annotations: torch.Tensor
     torch_type: dict
     
+def sim_anno_weight(num_anno, path):
+    prior = torch.ones(num_anno) / (num_anno + 1)
+    num_zero = num_anno//3
+    random_positions = torch.randperm(num_anno)[:num_zero]
+    prior[random_positions] = 1e-10
+    
+    annotations_weight = pyro.sample("annotation_weights", dist.Dirichlet(prior))
+    #annotations_weight = pyro.sample("annotation_weights", dist.Dirichlet(prior).expand([num_anno]).to_event(1))
+    #sim = torch.stack([prior, annotations_weight]).detach().numpy()
+    
+    #sim_weight = pd.DataFrame({'prior': sim[0], 'weight': sim[1]})
+    #print(annotations_weight)
+#     sim_weight.to_csv(path+'prior.tsv', index = False, sep = '\t')
+
+    return(annotations_weight)
+    
 
 def get_posterior_stats(
     model,
     guide, 
     data, 
     phi_known, 
+    a, 
     phi_as_prior, 
     num_samples=100
 ): 
@@ -51,17 +68,26 @@ def get_posterior_stats(
         num_samples=num_samples) 
     
     samples = predictive(data) ## get posterior samples
+    
     samples["beta"] = torch.zeros(num_samples,data.p,**data.torch_type)
     
     ## phi is the global scaling, psi is the local one.
-    for i in range(num_samples):
+    for i in range(num_samples): # could just optimize hyperparameters? 
         if data.annotations is None: 
             phi = samples["sqrt_phi"][i]**2 if (phi_known is None) else phi_known 
         else: 
             sqrt_phi = torch.nn.functional.softplus(data.annotations @ samples["annotation_weights"][i])
             phi = sqrt_phi**2
-        psi = samples["sqrt_psi"][i]**2
-        v = psi if phi_as_prior else psi*psi
+        
+        if a==0.: 
+            psi = samples["sqrt_psi"][i]**2
+        elif a==np.inf:
+            one_vec = torch.ones(data.p,**data.torch_type)
+            psi = (phi * one_vec) if phi_as_prior else one_vec
+        else:
+            psi = samples["psi"][i]
+            
+        v = psi if phi_as_prior else phi*psi
 
         mm = 0
         for kk in range(len(data.ld_blk)):
@@ -87,47 +113,57 @@ def convertr(hyperparam, name, device):
     ) else pyro.sample(name, hyperparam)
 
 
-def model_collapsed(data, path, sigma_noise = 1., phi_as_prior = False, sqrt_phi = dist.HalfCauchy(1.), desired_min_eig = 1e-6, gaussian_anno_weight = True): 
+def model_collapsed(
+    data, 
+    sigma_noise = 1., 
+    phi_as_prior = True, 
+    a = dist.Gamma(2.,2.), 
+    sqrt_phi = dist.HalfCauchy(1.), 
+    desired_min_eig = 1e-6): 
     
     device = data.beta_mrg.device
     
     zero = torch.tensor(0., **data.torch_type)
     one = torch.tensor(1., **data.torch_type)
+    one_vec = torch.ones(data.p, **data.torch_type)
     
-    ## handling annotations
+    ## handling annotations. could simply this a bunch if we dropped phi_as_prior
     if not data.annotations is None:
         n_annotations = data.annotations.shape[1] 
-        
-        ## original one
-        if gaussian_anno_weight:
-            annotation_weights = pyro.sample(
-                "annotation_weights",
-                dist.Normal(zero, one).expand([n_annotations]).to_event(1) 
-            )
-        else:  
-            prior = torch.ones(n_annotations) / (n_annotations + 1)
-            n_zero = n_annotations//3
-            random_positions = torch.randperm(n_annotations)[:n_zero]
-            prior[random_positions] = 1e-10
-            annotation_weights = pyro.sample("annotation_weights", dist.Dirichlet(prior))
-            
-       
-        sqrt_phi = torch.nn.functional.softplus(data.annotations @ annotation_weights) # or exp?
-        sqrt_psi = pyro.sample( # constrain < 1? 
-            "sqrt_psi",
-             dist.HalfCauchy(sqrt_phi if phi_as_prior else torch.ones(data.p, **data.torch_type)).to_event(1) 
+        annotation_weights = pyro.sample(
+            "annotation_weights",
+            dist.Normal(zero, one).expand([n_annotations]).to_event(1) 
         )
-            
+        #sqrt_phi = torch.nn.functional.softplus(data.annotations @ annotation_weights.double()) 
+        sqrt_phi = torch.nn.functional.softplus(data.annotations @ annotation_weights) # or exp?
+        phi = sqrt_phi**2
+        
+        if a == 0.: # a==0 implies using the HalfCauchy setup
+            sqrt_psi = pyro.sample("sqrt_psi", dist.HalfCauchy(sqrt_phi if phi_as_prior else one_vec).to_event(1))
+            psi = sqrt_psi**2
+        elif a == np.inf: # corresponds to beta~normal(0,sqrt_phi) i.e. infinitesimal model aka Bayesian ridge regression
+            psi = (phi * one_vec) if phi_as_prior else one_vec
+        else:
+            delta = pyro.sample("delta", dist.Gamma(0.5 * one, phi if phi_as_prior else one_vec).expand([data.p]).to_event(1))
+            a_param = convertr(a, "a", device=device)
+            psi = pyro.sample("psi", dist.Gamma(a_param, delta).to_event(1)) # delta is the rate
+    
     else: 
         sqrt_phi = convertr(sqrt_phi, "sqrt_phi", device = device)
-        sqrt_psi = pyro.sample( # constrain < 1? 
-            "sqrt_psi",
-             dist.HalfCauchy(sqrt_phi if phi_as_prior else one).expand([data.p]).to_event(1)) # PRSCS uses Strawderman-Berger here
-    
-    phi = sqrt_phi**2
-    psi = sqrt_psi**2
+        phi = sqrt_phi**2
+
+        if a == 0.: # a==0 implies using the HalfCauchy setup
+            sqrt_psi = pyro.sample("sqrt_psi", dist.HalfCauchy(sqrt_phi if phi_as_prior else one).expand([data.p]).to_event(1))
+            psi = sqrt_psi**2
+        elif a == np.inf: # corresponds to beta~normal(0,sqrt_phi) i.e. infinitesimal model aka Bayesian ridge regression
+            psi = (phi * one_vec) if phi_as_prior else one_vec
+        else:
+            delta = pyro.sample("delta", dist.Gamma(0.5 * one, phi if phi_as_prior else one).expand([data.p]).to_event(1))
+            a_param = convertr(a, "a", device=device)
+            psi = pyro.sample("psi", dist.Gamma(a_param, delta).to_event(1)) # delta is the rate
     
     v = psi if phi_as_prior else phi*psi
+    
     initial_trace_flag = (v > 1).any().item() # hack. better way to do this? 
             
     sigma_noise = convertr(sigma_noise, "sigma_noise", device = device)
@@ -139,7 +175,7 @@ def model_collapsed(data, path, sigma_noise = 1., phi_as_prior = False, sqrt_phi
     sigma_over_sqrt_n = sigma_noise / torch.sqrt(torch_n)
     
     mm = 0
-    for kk in range(len(data.ld_blk)): ## for every LD block
+    for kk in range(len(data.ld_blk)):
         assert(data.blk_size[kk] > 0)
         
         idx_blk = torch.arange(mm,mm+data.blk_size[kk])
@@ -174,9 +210,8 @@ def model_collapsed(data, path, sigma_noise = 1., phi_as_prior = False, sqrt_phi
                 scale_tril = chol_cov * sigma_over_sqrt_n
             ), 
             obs = data.beta_mrg[idx_blk])
-    
+        
         mm += data.blk_size[kk]
-    
 
         
 def psi_guide(data):
@@ -290,7 +325,8 @@ def vi(
     device = "cpu",
     annotations = None,
     sigma_noise = None, 
-    phi = None, 
+    phi = None,
+    beta_prior_a = None, 
     phi_as_prior = False,
     constrain_psi = True, 
     constrain_sigma = False,
@@ -312,6 +348,7 @@ def vi(
         annotations (torch.Tensor, optional): Annotation data: a SNPs x annotations torch.tensor. One column should be all 1s (intercept) (default is None). Note: Annotations need to be float tensor!
         sigma_noise (optional): If None, sigma_noise will be inferred. If a float, will be fixed to that value (default is None).
         phi (float, optional): If None, phi will be inferred. If a float, will be fixed to that value (default is None).
+        beta_prior_a (float, optional): Variant effects are Half-t(dof=2*beta_prior_a) distributed. If None, beta_prior_a is learnt under a Gamma(2,2) prior (default is None).
         phi_as_prior (bool, optional): Whether to represent sqrt_psi ~ HalfCauchy(sqrt_phi) rather than having prior_variance \propto phi * psi. These models are equivalent in principle but inference works quite differently (default changed from true to false).
         constrain_psi (bool, optional): Constrain psi parameter to [0,1] (default is True).
         constrain_sigma (bool, optional): Constrain sigma_noise parameter to [0,1] (default is False).
@@ -352,12 +389,13 @@ def vi(
     one = torch.tensor(1., **torch_type)
     sqrt_phi = dist.HalfCauchy(one) if (phi is None) else np.sqrt(phi).to(**torch_type)
     sigma_noise = dist.HalfCauchy(one) if (sigma_noise is None) else sigma_noise # dist.Gamma(2. * one, 2. * one), dist.InverseGamma(0.001 * one, 0.001 * one)
-    model = lambda dat: model_collapsed(dat, sigma_noise = sigma_noise, phi_as_prior = phi_as_prior, sqrt_phi = sqrt_phi, desired_min_eig = desired_min_eig, gaussian_anno_weight = gaussian_anno_weight, path = path)       
+    a = dist.Gamma(2.,2.) if (beta_prior_a is None) else beta_prior_a
+    model = lambda dat: model_collapsed(dat, a=a, sigma_noise = sigma_noise, phi_as_prior = phi_as_prior, sqrt_phi = sqrt_phi, desired_min_eig = desired_min_eig)       
     
     guide = AutoGuideList(model)
     to_expose = []
     if not (annotations is None): to_expose.append("annotation_weights")
-    if phi is None: to_expose.append("sqrt_phi")
+    if phi is None: to_expose.append("sqrt_phi") # if we are learning phi
     if len(to_expose) > 0: 
         guide.add(AutoDiagonalNormal(
             poutine.block(
@@ -367,20 +405,21 @@ def vi(
                 "sqrt_phi" : torch.sqrt(torch.tensor(0.01, **torch_type))
             })))
         
-    if (type(sigma_noise) != float):
+    if (type(sigma_noise) != float): # if we are learning the noise variance
         guide.add(sigma_guide if constrain_sigma else AutoDiagonalNormal(
             poutine.block(
                 model,
                 expose = ["sigma_noise"]),
-            init_loc_fn = init_to_value(values={"sigma_noise" : one})))    
-    guide.add(psi_guide if constrain_psi else AutoDiagonalNormal(
-        poutine.block(
-            model,
-            expose = ["sqrt_psi"]),
-        init_loc_fn = init_to_value(values={"sqrt_psi" : torch.sqrt(torch.full([p],0.1,**torch_type))})))
+            init_loc_fn = init_to_value(values={"sigma_noise" : one})))
+    if a!=np.inf:
+        guide.add(psi_guide if constrain_psi else AutoDiagonalNormal(
+            poutine.block(
+                model,
+                expose = ["sqrt_psi"]),
+            init_loc_fn = init_to_value(values={"sqrt_psi" : torch.sqrt(torch.full([p],0.1,**torch_type))})))
     
     losses = my_optimizer(model, guide, data, **opt_kwargs)
-    stats = get_posterior_stats(model, guide, data, phi, phi_as_prior = phi_as_prior)
+    stats = get_posterior_stats(model, guide, data, phi, a=a, phi_as_prior = phi_as_prior)
     beta_est = stats["beta"]["mean"].squeeze().cpu().numpy()
     if data.annotations is None: 
         phi_est = stats["sqrt_phi"]["mean"]**2 if (phi is None) else phi
