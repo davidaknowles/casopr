@@ -88,13 +88,9 @@ def load_data(chrom,ref_df,  path, anno_path, prop_nz,noise_size, bim_prefix, ss
     beta_true, beta_mrg, annotations, anno_names = simulate.simulate_sumstats(ld_blk, blk_size, n_gwas, len(sst_dict), sst_dict, path, anno_path = anno_path, chrom=chrom,prop_nz = prop_nz, noise_size = noise_size)
     return ref_df, vld_df, sst_dict, ld_blk, ld_blk_sym, blk_size, beta_true, beta_mrg, annotations, anno_names
 
-def check_sim_result(save_fig_name, anno_path, test, gaussian_anno_weight = True, noise_size = 0, refit_time = 10,prop_nz = 0.2, phi_as_prior = False, constrain_sigma = True, lr = 0.03, chrom=range(20,23), run_prscs = False):
+def check_sim_result(save_fig_name, anno_path, test, gaussian_anno_weight = True, noise_size = 0, refit_time = 10,prop_nz = 0.2, phi_as_prior = False, constrain_sigma = True, lr = 0.03, chrom = 21, run_prscs = False):
     ## initializing
-    # chr_dict =  {
-    #     'bim_prefix' : "test_data/ADSP_qc_chr%s"%chrom,
-    #     'sst_file' : "test_data/wightman_chr%s.tsv"%chrom,
-    #     'n_gwas' : 762971
-    # }
+    
     
     chr_dict = {
     'ref_dir' : '/gpfs/commons/groups/knowles_lab/data/ADSP_reguloML/LD_PRScs/ldblk_ukbb_eur', ## add my path
@@ -138,7 +134,7 @@ def check_sim_result(save_fig_name, anno_path, test, gaussian_anno_weight = True
     elif 'ukbb' in os.path.basename(param_dict['ref_dir']):
         ref_df = parse_genet.parse_ref(param_dict['ref_dir'] + '/snpinfo_ukbb_hm3')
     
-    if (isinstance(chrom, int)):
+    if (chrom == 22):
         print('running on chr%s'%chrom)
         ref_df, vld_df, sst_dict, ld_blk, ld_blk_sym, blk_size, beta_true, beta_mrg, annotations, anno_names = load_data(chrom,ref_df, path,anno_path, prop_nz, noise_size, param_dict['bim_prefix'], param_dict['sst_file'],param_dict['n_gwas'],param_dict['ref_dir'] )
         # ref_df = ref_df[ref_df.CHR == chrom]
@@ -153,7 +149,7 @@ def check_sim_result(save_fig_name, anno_path, test, gaussian_anno_weight = True
         annotations, beta_true, beta_mrg = torch.tensor([]), torch.tensor([]), torch.tensor([])
         sst_dict = pd.DataFrame()
         
-        for i in tqdm(chrom):
+        for i in tqdm(range(chrom ,23)):
             print('running on chr%s'%i)
             ref_df_chr, vld_df_chr, sst_dict_chr, ld_blk_chr, ld_blk_sym_chr, blk_size_chr, beta_true_chr, beta_mrg_chr, annotations_chr, anno_names = load_data(i, ref_df,path, anno_path, prop_nz, noise_size, param_dict['bim_prefix'], param_dict['sst_file'],param_dict['n_gwas'],param_dict['ref_dir'])
             
@@ -169,8 +165,6 @@ def check_sim_result(save_fig_name, anno_path, test, gaussian_anno_weight = True
     
     if anno_path != None:
         anno_names.insert(0,'intercept')    
-        
-    return ld_blk,ld_blk_sym,blk_size,annotations,beta_true,beta_mrg, sst_dict,anno_names
     
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     
@@ -242,7 +236,7 @@ if __name__ == "__main__":
     parser.add_argument("--noise_size", type=float, default = 0.1)
     parser.add_argument("--refit_time", type=int, default=10, help="Refit time (default: 20)")
     parser.add_argument("--lr", type=float, default=0.03, help="Learning rate (default: 0.03)")
-    parser.add_argument("--chrom", type=int, default=22, help="Chromosome (default: 22)")
+    parser.add_argument("--chrom_start", type=int, default=21, help="Chromosome (default: 22)")
     args = parser.parse_args()
     
     print('Parameters used:')
@@ -253,7 +247,7 @@ if __name__ == "__main__":
     print(' ')
     print('====== Start Running CasioPR ====== \n')
     #print("start testing params")
-    check_sim_result(args.save_fig_name, args.anno_path, args.test_on, gaussian_anno_weight = args.gaussian_anno_weight, noise_size = args.noise_size, refit_time = args.refit_time, lr = args.lr, chrom = args.chrom)
+    check_sim_result(args.save_fig_name, args.anno_path, args.test_on, gaussian_anno_weight = args.gaussian_anno_weight, noise_size = args.noise_size, refit_time = args.refit_time, lr = args.lr, chrom = args.chrom_start)
     
 '''
 Note:
