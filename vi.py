@@ -337,8 +337,6 @@ def vi(
 ):
     """Variational inference for PRSCS model
     
-    Doesn't support different a,b currently (just a=b=0.5 implicitly by using HalfCauchy priors).
-    
     Args:
         sst_df (dict): A pandas dataframe of summary statistics, including 'BETA' and 'SNP'.
         n (int): Number of individuals in the underlying GWAS.

@@ -1,10 +1,10 @@
 #!/bin/bash
-#SBATCH --job-name=dirichlet_dist
+#SBATCH --job-name=test_prior
 #SBATCH --partition=pe2
 #SBATCH --nodes=1           # minimum number of nodes to be allocated
 #SBATCH --ntasks=1          # number of tasks
 #SBATCH --cpus-per-task=8   # number of cores on the CPU for the task
-#SBATCH --mem=5G
+#SBATCH --mem=15G
 #SBATCH --time=34:00:00
 #SBATCH --output=/gpfs/commons/home/tlin/pic/casioPR/simulation/%x_%j.log
 
@@ -19,22 +19,10 @@ enformer='/gpfs/commons/groups/knowles_lab/data/ADSP_reguloML/annotations/annota
 
 all_anno='/gpfs/commons/groups/knowles_lab/data/ADSP_reguloML/annotations/annotations_high_h2/baseline/baseline_high_h2_chr,/gpfs/commons/groups/knowles_lab/data/ADSP_reguloML/annotations/annotations_high_h2/deepsea/deepsea_high_h2_chr,/gpfs/commons/groups/knowles_lab/data/ADSP_reguloML/annotations/annotations_high_h2/enformer/enformer_high_h2_chr'
 
-
-
-#python test_simulation.py --save_fig_name normal_no_noise --anno_path False --test_on chr22 --gaussian_anno_weight True --noise_size 0 --refit_time 20
-
-#python test_simulation.py --save_fig_name normal_big_noise --anno_path False --test_on chr22 --gaussian_anno_weight True --noise_size 0.1 --refit_time 20
-
-#python test_simulation.py --save_fig_name normal_noise --anno_path False --test_on chr22 --gaussian_anno_weight True --noise_size 0.01 --refit_time 20
-
-
-
-#python test_simulation.py --save_fig_name normal_no_noise --anno_path False --test_on chr22 --gaussian_anno_weight False --noise_size 0 --refit_time 20
-
-#python test_simulation.py --save_fig_name normal_big_noise --anno_path False --test_on chr22 --gaussian_anno_weight True --noise_size 0.1 --refit_time 20
-
-python test_simulation.py --save_fig_name normal_noise --anno_path False --test_on chr22 --gaussian_anno_weight True --noise_size 0.01 --refit_time 20
-
+python test_simulation.py --save_fig_name prior_learnt --anno_path False --test_on sim --beta_prior_a None --refit_time 10 &
+python test_simulation.py --save_fig_name SB_prior --anno_path False --test_on sim --beta_prior_a 1 --refit_time 10 &
+python test_simulation.py --save_fig_name inf_prior --anno_path False --test_on sim --beta_prior_a inf --refit_time 10 &
+python test_simulation.py --save_fig_name horseshoe --anno_path False --test_on sim --beta_prior_a 0.5 --refit_time 10
 
 
 #python test_simulation.py normal_dist_add_noise $bl_anno chr22 0.2 False True --refit_time 20
