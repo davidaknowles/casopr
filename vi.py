@@ -213,15 +213,15 @@ def model_collapsed(
         
         mm += data.blk_size[kk]
 
-        
-def psi_guide(data):
+
+def psi_guide(data, var_name, loc_init = -1., scale_init = 0.1):
     
-    logit_psi_loc = pyro.param("logit_psi_loc", torch.full([data.p],-1., **data.torch_type))
-    logit_psi_scale = pyro.param("logit_psi_scale", torch.full_like(logit_psi_loc, 0.1, **data.torch_type), constraint = constraints.positive)
+    logit_psi_loc = pyro.param("logit_psi_loc", torch.full([data.p], loc_init, **data.torch_type))
+    logit_psi_scale = pyro.param("logit_psi_scale", torch.full([data.p], scale_init, **data.torch_type), constraint = constraints.positive)
     
     base_dist = dist.Normal(logit_psi_loc, logit_psi_scale).to_event(1)
     
-    sqrt_psi = pyro.sample("sqrt_psi", dist.TransformedDistribution(base_dist, SigmoidTransform()))
+    pyro.sample(var_name, dist.TransformedDistribution(base_dist, SigmoidTransform()))
     
 def sigma_guide(data):
     
@@ -396,6 +396,9 @@ def vi(
     to_expose = []
     if not (annotations is None): to_expose.append("annotation_weights")
     if phi is None: to_expose.append("sqrt_phi") # if we are learning phi
+    if (a!=np.inf) or (a==0.): to_expose.append("delta")
+    if (beta_prior_a is None): to_expose.append("a") # better to optimize? 
+        
     if len(to_expose) > 0: 
         guide.add(AutoDiagonalNormal(
             poutine.block(
@@ -411,12 +414,20 @@ def vi(
                 model,
                 expose = ["sigma_noise"]),
             init_loc_fn = init_to_value(values={"sigma_noise" : one})))
+    
     if a!=np.inf:
-        guide.add(psi_guide if constrain_psi else AutoDiagonalNormal(
-            poutine.block(
-                model,
-                expose = ["sqrt_psi"]),
-            init_loc_fn = init_to_value(values={"sqrt_psi" : torch.sqrt(torch.full([p],0.1,**torch_type))})))
+        if a==0.: 
+            guide.add((lambda data: psi_guide(data, "sqrt_psi")) if constrain_psi else AutoDiagonalNormal(
+                poutine.block(
+                    model,
+                    expose = ["sqrt_psi"]),
+                init_loc_fn = init_to_value(values={"sqrt_psi" : torch.sqrt(torch.full([p],0.1,**torch_type))})))
+        else:
+            guide.add((lambda data: psi_guide(data, "psi", loc_init = -2.)) if constrain_psi else AutoDiagonalNormal(
+                poutine.block(
+                    model,
+                    expose = ["psi"]),
+                init_loc_fn = init_to_value(values={"psi" : torch.sqrt(torch.full([p],0.01,**torch_type))})))
     
     losses = my_optimizer(model, guide, data, **opt_kwargs)
     stats = get_posterior_stats(model, guide, data, phi, a=a, phi_as_prior = phi_as_prior)
