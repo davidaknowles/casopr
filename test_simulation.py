@@ -77,7 +77,7 @@ def plot_pearsonr(beta_stats, include_prscs, refit_time, path):
     plt.savefig(path+'betas.pdf',format ='pdf',bbox_inches='tight')
     plt.show()  
 
-def check_sim_result(save_fig_name, anno_path, test, gaussian_anno_weight = True, noise_size = 0, refit_time = 10,prop_nz = 0.2, phi_as_prior = False, constrain_sigma = True, lr = 0.03, chrom=22, run_prscs = True):
+def check_sim_result(save_fig_name, anno_path, test, beta_prior_a = 0,  gaussian_anno_weight = True, noise_size = 0, refit_time = 10,prop_nz = 0.2, phi_as_prior = False, constrain_sigma = True, lr = 0.03, chrom=22, run_prscs = False):
     ## initializing
     # chr_dict =  {
     #     'bim_prefix' : "test_data/ADSP_qc_chr%s"%chrom,
@@ -115,6 +115,14 @@ def check_sim_result(save_fig_name, anno_path, test, gaussian_anno_weight = True
         # prop_nz = float(prop_nz)
         # phi_as_prior = bool(phi_as_prior)
         # constrain_sigma = bool(constrain_sigma)
+        
+    if (beta_prior_a == 'None'):
+        beta_prior_a = None
+    elif (beta_prior_a == 'inf'):
+        beta_prior_a = np.inf
+    else:
+        beta_prior_a = float(beta_prior_a)
+        
         
     anno_path = False if anno_path == 'False' else None if anno_path == 'None' else anno_path
         
@@ -207,6 +215,7 @@ if __name__ == "__main__":
     parser.add_argument("--save_fig_name", type=str, default = 'test', help="Save figure name")
     parser.add_argument("--anno_path", type=str, default = None, help="Annotation path")
     parser.add_argument("--test_on", type=str, default = 'sim', help="chr22 or sim")
+    parser.add_argument('--beta_prior_a', type = str, default = None, help = 'half-cauchy')
     parser.add_argument("--gaussian_anno_weight", type=bool, default = False, help="gaussian or dirichlet anno weights")
     parser.add_argument("--noise_size", type=float, default = 0.1)
     parser.add_argument("--refit_time", type=int, default=10, help="Refit time (default: 20)")
@@ -222,7 +231,7 @@ if __name__ == "__main__":
     print(' ')
     print('====== Start Running CasioPR ====== \n')
     #print("start testing params")
-    check_sim_result(args.save_fig_name, args.anno_path, args.test_on, gaussian_anno_weight = args.gaussian_anno_weight, noise_size = args.noise_size, refit_time = args.refit_time, lr = args.lr, chrom = args.chrom)
+    check_sim_result(args.save_fig_name, args.anno_path, args.test_on, beta_prior_a = args.beta_prior_a, gaussian_anno_weight = args.gaussian_anno_weight, noise_size = args.noise_size, refit_time = args.refit_time, lr = args.lr, chrom = args.chrom)
     
 '''
 Note:
