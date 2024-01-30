@@ -77,20 +77,21 @@ def plot_pearsonr(beta_stats, include_prscs, refit_time, path):
     plt.savefig(path+'betas.pdf',format ='pdf',bbox_inches='tight')
     plt.show()  
 
-def load_data(chrom,ref_df,  path, anno_path, prop_nz,noise_size, bim_prefix, sst_file_name , n_gwas, ref_dir):
+def load_data(chrom,ref_df,  path, anno_path, prop_nz, noise_size, bim_prefix, sst_file_name , n_gwas, ref_dir):
     ref_df = ref_df[ref_df.CHR == chrom]
     # vld_df = parse_genet.parse_bim(bim_prefix + ".bim")
     # vld_df = vld_df[vld_df.CHR == chrom]
-    vld_df = parse_genet.parse_bim(bim_prefix + "%s.bim"%chrom)
+    vld_df = parse_genet.parse_bim(bim_prefix + "%s.bim"%chrom) if sst_file_name != "test_data/sumstats.txt" else parse_genet.parse_bim(bim_prefix + ".bim")
     sst_dict = parse_genet.parse_sumstats(ref_df, vld_df, sst_file_name, n_gwas)
     ld_blk, ld_blk_sym, blk_size = parse_genet.parse_ldblk(ref_dir, sst_dict, chrom)
     print("There are %s ld_block. in chr%s\n" %(len(ld_blk),chrom))
     beta_true, beta_mrg, annotations, anno_names = simulate.simulate_sumstats(ld_blk, blk_size, n_gwas, len(sst_dict), sst_dict, path, anno_path = anno_path, chrom=chrom,prop_nz = prop_nz, noise_size = noise_size)
     return ref_df, vld_df, sst_dict, ld_blk, ld_blk_sym, blk_size, beta_true, beta_mrg, annotations, anno_names
 
-def check_sim_result(save_fig_name, anno_path, test, gaussian_anno_weight = True, noise_size = 0, refit_time = 10,prop_nz = 0.2, phi_as_prior = False, constrain_sigma = True, lr = 0.03, chrom = 21, run_prscs = False):
+def check_sim_result(save_fig_name, anno_path, use_sim_dict = False, gaussian_anno_weight = True, noise_size = 0, refit_time = 10,prop_nz = 0.2, phi_as_prior = False, constrain_sigma = True, lr = 0.03, chrom = 21, run_prscs = False):
     ## initializing
     
+    use_sim_dict = bool(use_sim_dict)
     
     chr_dict = {
     'ref_dir' : '/gpfs/commons/groups/knowles_lab/data/ADSP_reguloML/LD_PRScs/ldblk_ukbb_eur', ## add my path
@@ -105,9 +106,10 @@ def check_sim_result(save_fig_name, anno_path, test, gaussian_anno_weight = True
         'n_gwas' : 200000
     }
     
-    if test == 'sim':
+    if use_sim_dict :
         param_dict = sim_dict
         print('simulate 1k SNP')
+        chrom = 22
      
     else:
         param_dict = chr_dict
@@ -231,13 +233,14 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Run simulation")
     parser.add_argument("--save_fig_name", type=str, default = 'test', help="Save figure name")
     parser.add_argument("--anno_path", type=str, default = None, help="Annotation path")
-    parser.add_argument("--test_on", type=str, default = 'sim', help="chr22 or sim")
     parser.add_argument("--gaussian_anno_weight", type=bool, default = False, help="gaussian or dirichlet anno weights")
     parser.add_argument("--noise_size", type=float, default = 0.1)
-    parser.add_argument("--refit_time", type=int, default=10, help="Refit time (default: 20)")
+    parser.add_argument("--refit_time", type=int, default=10, help="Refit time (default: 10)")
     parser.add_argument("--lr", type=float, default=0.03, help="Learning rate (default: 0.03)")
-    parser.add_argument("--chrom_start", type=int, default=21, help="Chromosome (default: 22)")
+    parser.add_argument("--chrom_start", type=int, default=21, help="Chromosome (default: 21)")
+    parser.add_argument("--use_sim_dict", type=bool, default=False, help="load dict from real data or the simulated one from PRSCS")
     args = parser.parse_args()
+    print(' ')
     
     print('Parameters used:')
     for arg_name, arg_value in vars(args).items():
@@ -245,9 +248,9 @@ if __name__ == "__main__":
     
     print(' ')
     print(' ')
+    print(' ')
     print('====== Start Running CasioPR ====== \n')
-    #print("start testing params")
-    check_sim_result(args.save_fig_name, args.anno_path, args.test_on, gaussian_anno_weight = args.gaussian_anno_weight, noise_size = args.noise_size, refit_time = args.refit_time, lr = args.lr, chrom = args.chrom_start)
+    check_sim_result(args.save_fig_name, args.anno_path, gaussian_anno_weight = args.gaussian_anno_weight, noise_size = args.noise_size, refit_time = args.refit_time, lr = args.lr, chrom = args.chrom_start, use_sim_dict = args.use_sim_dict)
     
 '''
 Note:
