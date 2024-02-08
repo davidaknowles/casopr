@@ -88,7 +88,7 @@ def check_sim_result(save_fig_name, anno_path, test, beta_prior_a = 0,  gaussian
     chr_dict = {
     'ref_dir' : '/gpfs/commons/groups/knowles_lab/data/ADSP_reguloML/LD_PRScs/ldblk_ukbb_eur', ## add my path
     'bim_prefix' : '/gpfs/commons/groups/knowles_lab/data/ADSP_reguloML/ADSP_vcf/17K_final/annotated_filtered_hg37/plink/vcf_filt/ADSP_annotated_chr%s'%chrom,
-    'sst_file' : '/gpfs/commons/groups/knowles_lab/data/ADSP_reguloML/summary_stats/alzheimers/fixed_alzheimers/processed/wightman_fixed_beta_qc.tsv',
+    'sst_file' : 'test_data/wightman4prscs.tsv',
     'n_gwas' : 762971
     }
     
@@ -135,8 +135,9 @@ def check_sim_result(save_fig_name, anno_path, test, beta_prior_a = 0,  gaussian
         ref_df = parse_genet.parse_ref(param_dict['ref_dir'] + '/snpinfo_1kg_hm3')
     elif 'ukbb' in os.path.basename(param_dict['ref_dir']):
         ref_df = parse_genet.parse_ref(param_dict['ref_dir'] + '/snpinfo_ukbb_hm3')
-
+    
     ref_df = ref_df[ref_df.CHR == chrom]
+    print(ref_df)
     vld_df = parse_genet.parse_bim(param_dict['bim_prefix'] + ".bim")
     vld_df = vld_df[vld_df.CHR == chrom]
     sst_dict = parse_genet.parse_sumstats(ref_df, vld_df, param_dict['sst_file'], param_dict['n_gwas'])
@@ -155,9 +156,11 @@ def check_sim_result(save_fig_name, anno_path, test, beta_prior_a = 0,  gaussian
     plt.figure()
     anno_list=pd.DataFrame()
     betas = pd.DataFrame({'beta_true':beta_true, 'beta_marginal':beta_mrg})
+    betas.to_csv(path+'betas.tsv', sep = '\t', index = False)
+    print(betas)
     for i in tqdm(range(refit_time)):
         print('Re-train the model %d time(s)'% (i+1))
-        losses, beta, phi_est, stats =  vi.vi(sst_dict, param_dict['n_gwas'], ld_blk, blk_size, device = device, annotations = annotations, max_iterations = param_dict['n_iter'], max_particles=4, desired_min_eig = 1e-3, min_iterations = 200, stall_window = 30, phi_as_prior = phi_as_prior, lr = lr, constrain_sigma = constrain_sigma, gaussian_anno_weight = gaussian_anno_weight, path = path)
+        losses, beta, phi_est, stats =  vi.vi(sst_dict, param_dict['n_gwas'], ld_blk, blk_size, device = device, annotations = annotations, max_iterations = param_dict['n_iter'], beta_prior_a = beta_prior_a, max_particles=4, desired_min_eig = 1e-3, min_iterations = 200, stall_window = 30, phi_as_prior = phi_as_prior, lr = lr, constrain_sigma = constrain_sigma, gaussian_anno_weight = gaussian_anno_weight, path = path)
         column_name = f'beta_casioPR_{i + 1}'
         betas[column_name] = beta
         plt.plot(losses);plt.title('losses')
@@ -177,11 +180,11 @@ def check_sim_result(save_fig_name, anno_path, test, beta_prior_a = 0,  gaussian
     betas.to_csv(path+'betas.tsv', sep = '\t', index = False)
 
     
-    ## get pearson, MSE, and mannwhitney U test 
+    # get pearson, MSE, and mannwhitney U test 
     beta_stats = get_beta_stats(betas)
     beta_stats.to_csv(path+'betas_stat.tsv', sep = '\t', index = False)
     
-    ##  plot pearson r between the marginal beta and betea of PRSCS/CasioPR 
+    #  plot pearson r between the marginal beta and betea of PRSCS/CasioPR 
     plot_pearsonr(beta_stats, run_prscs, refit_time, path)
          
 
