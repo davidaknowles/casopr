@@ -77,7 +77,6 @@ def plot_pearsonr(beta_stats, include_prscs, refit_time, path):
     plt.savefig(path+'betas.pdf',format ='pdf',bbox_inches='tight')
     plt.show()  
 
-<<<<<<< HEAD
 def load_data(chrom,ref_df,  path, anno_path, prop_nz, noise_size, bim_prefix, sst_file_name , n_gwas, ref_dir):
     ref_df = ref_df[ref_df.CHR == chrom]
     # vld_df = parse_genet.parse_bim(bim_prefix + ".bim")
@@ -89,21 +88,13 @@ def load_data(chrom,ref_df,  path, anno_path, prop_nz, noise_size, bim_prefix, s
     beta_true, beta_mrg, annotations, anno_names = simulate.simulate_sumstats(ld_blk, blk_size, n_gwas, len(sst_dict), sst_dict, path, anno_path = anno_path, chrom=chrom,prop_nz = prop_nz, noise_size = noise_size)
     return ref_df, vld_df, sst_dict, ld_blk, ld_blk_sym, blk_size, beta_true, beta_mrg, annotations, anno_names
 
-def check_sim_result(save_fig_name, anno_path, use_sim_dict = False, gaussian_anno_weight = True, noise_size = 0, refit_time = 10,prop_nz = 0.2, phi_as_prior = False, constrain_sigma = True, lr = 0.03, chrom = 21, run_prscs = False):
-=======
-def check_sim_result(save_fig_name, anno_path, test, beta_prior_a = 0,  gaussian_anno_weight = True, noise_size = 0, refit_time = 10,prop_nz = 0.2, phi_as_prior = False, constrain_sigma = True, lr = 0.03, chrom=22, run_prscs = False):
->>>>>>> prior
+def check_sim_result(save_fig_name, anno_path, beta_prior_a = 0, use_sim_dict = False, gaussian_anno_weight = True, noise_size = 0, refit_time = 10,prop_nz = 0.2, phi_as_prior = False, constrain_sigma = True, lr = 0.03, chrom=22, run_prscs = False):
     ## initializing
-    
     use_sim_dict = bool(use_sim_dict)
     
     chr_dict = {
     'ref_dir' : '/gpfs/commons/groups/knowles_lab/data/ADSP_reguloML/LD_PRScs/ldblk_ukbb_eur', ## add my path
-<<<<<<< HEAD
     'bim_prefix' : '/gpfs/commons/groups/knowles_lab/data/ADSP_reguloML/ADSP_vcf/17K_final/annotated_filtered_hg37/plink/vcf_filt/ADSP_annotated_chr',
-=======
-    'bim_prefix' : '/gpfs/commons/groups/knowles_lab/data/ADSP_reguloML/ADSP_vcf/17K_final/annotated_filtered_hg37/plink/vcf_filt/ADSP_annotated_chr%s'%chrom,
->>>>>>> prior
     'sst_file' : 'test_data/wightman4prscs.tsv',
     'n_gwas' : 762971
     }
@@ -151,19 +142,7 @@ def check_sim_result(save_fig_name, anno_path, test, beta_prior_a = 0,  gaussian
         ref_df = parse_genet.parse_ref(param_dict['ref_dir'] + '/snpinfo_1kg_hm3')
     elif 'ukbb' in os.path.basename(param_dict['ref_dir']):
         ref_df = parse_genet.parse_ref(param_dict['ref_dir'] + '/snpinfo_ukbb_hm3')
-<<<<<<< HEAD
-=======
-    
-    ref_df = ref_df[ref_df.CHR == chrom]
-    print(ref_df)
-    vld_df = parse_genet.parse_bim(param_dict['bim_prefix'] + ".bim")
-    vld_df = vld_df[vld_df.CHR == chrom]
-    sst_dict = parse_genet.parse_sumstats(ref_df, vld_df, param_dict['sst_file'], param_dict['n_gwas'])
-    ld_blk, ld_blk_sym, blk_size = parse_genet.parse_ldblk(param_dict['ref_dir'], sst_dict, chrom)
-    print("There are %s ld_block. \n" %(len(ld_blk)))
-    beta_true, beta_mrg, annotations, anno_names = simulate.simulate_sumstats(ld_blk, blk_size, param_dict['n_gwas'], len(sst_dict), sst_dict, path, anno_path = anno_path, chrom=chrom,prop_nz = prop_nz, noise_size = noise_size)
->>>>>>> prior
-    
+
     if (chrom == 22):
         print('running on chr%s'%chrom)
         ref_df, vld_df, sst_dict, ld_blk, ld_blk_sym, blk_size, beta_true, beta_mrg, annotations, anno_names = load_data(chrom,ref_df, path,anno_path, prop_nz, noise_size, param_dict['bim_prefix'], param_dict['sst_file'],param_dict['n_gwas'],param_dict['ref_dir'] )
@@ -247,7 +226,6 @@ def check_sim_result(save_fig_name, anno_path, test, beta_prior_a = 0,  gaussian
         print(anno_list)
         
         ## only_for_perfect_anno
-       
             # plt.figure()
             # correlation = anno_list.iloc[:][1].corr(anno_list.iloc[:][2])
             # sns.regplot(anno_list.iloc[:][1],anno_list.iloc[:][2], ci=None,marker="p", color="b", line_kws=dict(color="r", alpha = 0.5))
@@ -263,11 +241,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Run simulation")
     parser.add_argument("--save_fig_name", type=str, default = 'test', help="Save figure name")
     parser.add_argument("--anno_path", type=str, default = None, help="Annotation path")
-<<<<<<< HEAD
-=======
-    parser.add_argument("--test_on", type=str, default = 'sim', help="chr22 or sim")
     parser.add_argument('--beta_prior_a', type = str, default = None, help = 'half-cauchy')
->>>>>>> prior
     parser.add_argument("--gaussian_anno_weight", type=bool, default = False, help="gaussian or dirichlet anno weights")
     parser.add_argument("--noise_size", type=float, default = 0.1)
     parser.add_argument("--refit_time", type=int, default=10, help="Refit time (default: 10)")
@@ -285,12 +259,8 @@ if __name__ == "__main__":
     print(' ')
     print(' ')
     print('====== Start Running CasioPR ====== \n')
-<<<<<<< HEAD
-    check_sim_result(args.save_fig_name, args.anno_path, gaussian_anno_weight = args.gaussian_anno_weight, noise_size = args.noise_size, refit_time = args.refit_time, lr = args.lr, chrom = args.chrom_start, use_sim_dict = args.use_sim_dict)
-=======
-    #print("start testing params")
-    check_sim_result(args.save_fig_name, args.anno_path, args.test_on, beta_prior_a = args.beta_prior_a, gaussian_anno_weight = args.gaussian_anno_weight, noise_size = args.noise_size, refit_time = args.refit_time, lr = args.lr, chrom = args.chrom)
->>>>>>> prior
+    check_sim_result(args.save_fig_name, args.anno_path,beta_prior_a = args.beta_prior_a,  gaussian_anno_weight = args.gaussian_anno_weight, noise_size = args.noise_size, refit_time = args.refit_time, lr = args.lr, chrom = args.chrom_start, use_sim_dict = args.use_sim_dict)
+
     
 '''
 Note:

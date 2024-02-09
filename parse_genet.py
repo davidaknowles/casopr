@@ -22,7 +22,6 @@ def parse_ref(ref_file):
     return pd.read_csv(ref_file, sep="\t")
 
 def parse_bim(bim_file):
-    
     return pd.read_csv(bim_file, sep="\t", names = ["CHR", "SNP", "huh", "pos", "A1", "A2"], usecols = ["CHR", "SNP", "A1", "A2"])
 
 def parse_sumstats(ref_dict, vld_dict, sst_file, n_subj):
