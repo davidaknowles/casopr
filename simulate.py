@@ -49,7 +49,11 @@ def simulate_sumstats(ld_blk, blk_size, n_gwas, n_variant, sst_dict, path, anno_
     ### reading annotations
     if anno_path == False : ## perfect anno
         print('... simulating perfect anno...')
-     
+        if (use_sumstat_beta):  
+            print('... using real betas from sumstats ...')
+            beta_true = sst_dict['BETA']
+            nz = abs(beta_true) < prop_nz
+ 
         print('... add noise between +- %s for the perfect anno ...'% noise_size)
         noise = (2 * torch.rand(n_variant)- 1 )* noise_size
         perfect = nz
@@ -58,7 +62,7 @@ def simulate_sumstats(ld_blk, blk_size, n_gwas, n_variant, sst_dict, path, anno_
 
         annotations = torch.stack([torch.ones(n_variant),nz,torch.randn(n_variant)]).T # intercept, useful annotation, random annotation
         anno_names = ["perfect anno",'random anno']
-       
+
     else: ## either use anno provided in anno_path (can be single, multiple, or none)
         annotations, anno_names = parse_genet.parse_anno(anno_path, sst_dict, chrom = chrom)
     
