@@ -247,7 +247,8 @@ if __name__ == "__main__":
     parser.add_argument("--refit_time", type=int, default=10, help="Refit time (default: 10)")
     parser.add_argument("--lr", type=float, default=0.03, help="Learning rate (default: 0.03)")
     parser.add_argument("--chrom_start", type=int, default=21, help="Chromosome (default: 21)")
-    parser.add_argument("--use_sim_dict", type=bool, default=False, help="load dict from real data or the simulated one from PRSCS")
+    parser.add_argument("--use_sim_dict", type=bool, default=False, help="load dict from real data or the simulated one from PRSCS(default False)")
+    #parser.add_argument("--use_sim", action='store_true',help="load dict from real data or the simulated one from PRSCS(default False)")
     args = parser.parse_args()
     print(' ')
     
@@ -260,6 +261,7 @@ if __name__ == "__main__":
     print(' ')
     print('====== Start Running CasioPR ====== \n')
     check_sim_result(args.save_fig_name, args.anno_path,beta_prior_a = args.beta_prior_a,  gaussian_anno_weight = args.gaussian_anno_weight, noise_size = args.noise_size, refit_time = args.refit_time, lr = args.lr, chrom = args.chrom_start, use_sim_dict = args.use_sim_dict)
+    
 
     
 '''
