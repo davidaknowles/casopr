@@ -20,7 +20,6 @@ import simulate
 import torch
 import matplotlib.pyplot as plt
 import numpy as np
-
 import mcmc_gtb
 import pyro.distributions as dist
 
@@ -41,9 +40,7 @@ def get_name(save_fig_name, refit_time):
     random_name = ''.join(random.choices(string.ascii_lowercase +string.digits, k=3))
     date = pd.Timestamp(datetime.date.today()).strftime("%m%d")
     save_dir = '/gpfs/commons/home/tlin/pic/casioPR/simulation/' + date
-    if not os.path.isdir(save_dir):
-        os.mkdir(save_dir)
-        print('creating dir %s'%save_dir)
+    os.makedirs(save_dir, exist_ok=True)
     path= save_dir + '/' + save_fig_name + '_' + 'iter%d'%refit_time +'_'+random_name +'_'
     return(path)
 
@@ -83,18 +80,20 @@ def load_data(chrom,ref_df,  path, anno_path, prop_nz, noise_size, bim_prefix, s
     # vld_df = vld_df[vld_df.CHR == chrom]
     vld_df = parse_genet.parse_bim(bim_prefix + "%s.bim"%chrom) if sst_file_name != "test_data/sumstats.txt" else parse_genet.parse_bim(bim_prefix + ".bim")
     sst_dict = parse_genet.parse_sumstats(ref_df, vld_df, sst_file_name, n_gwas)
+#    sst_dict = parse_genet.parse_sumstats_no_vld(ref_df, sst_file_name, n_gwas)
+    
     ld_blk, ld_blk_sym, blk_size = parse_genet.parse_ldblk(ref_dir, sst_dict, chrom)
     print("There are %s ld_block. in chr%s\n" %(len(ld_blk),chrom))
     beta_true, beta_mrg, annotations, anno_names = simulate.simulate_sumstats(ld_blk, blk_size, n_gwas, len(sst_dict), sst_dict, path, anno_path = anno_path, chrom=chrom,prop_nz = prop_nz, noise_size = noise_size)
     return ref_df, vld_df, sst_dict, ld_blk, ld_blk_sym, blk_size, beta_true, beta_mrg, annotations, anno_names
 
-def check_sim_result(save_fig_name, anno_path, beta_prior_a = 0, use_sim_dict = False, gaussian_anno_weight = True, noise_size = 0, refit_time = 10,prop_nz = 0.2, phi_as_prior = False, constrain_sigma = True, lr = 0.03, chrom=22, run_prscs = False):
+def check_sim_result(save_fig_name, anno_path, beta_prior_a = 0, use_sim_dict = False, gaussian_anno_weight = True, noise_size = 0, refit_time = 10,prop_nz = 0.2, phi_as_prior = False, constrain_sigma = True, lr = 0.03, chrom=22, run_prscs = True):
     ## initializing
     use_sim_dict = bool(use_sim_dict)
-    
+    #17k 'bim_prefix' : '/gpfs/commons/groups/knowles_lab/data/ADSP_reguloML/ADSP_vcf/17K_final/annotated_filtered_hg37/plink/vcf_filt/ADSP_annotated_chr',
     chr_dict = {
     'ref_dir' : '/gpfs/commons/groups/knowles_lab/data/ADSP_reguloML/LD_PRScs/ldblk_ukbb_eur', ## add my path
-    'bim_prefix' : '/gpfs/commons/groups/knowles_lab/data/ADSP_reguloML/ADSP_vcf/17K_final/annotated_filtered_hg37/plink/vcf_filt/ADSP_annotated_chr',
+    'bim_prefix' : '/gpfs/commons/groups/knowles_lab/data/ADSP_reguloML/ADSP_vcf/36K_QC/annotated_hg37_plink_ibd/qc/qc_chr',
     'sst_file' : 'test_data/wightman4prscs.tsv',
     'n_gwas' : 762971
     }
@@ -161,7 +160,7 @@ def check_sim_result(save_fig_name, anno_path, beta_prior_a = 0, use_sim_dict = 
         for i in tqdm(range(chrom ,23)):
             print('running on chr%s'%i)
             ref_df_chr, vld_df_chr, sst_dict_chr, ld_blk_chr, ld_blk_sym_chr, blk_size_chr, beta_true_chr, beta_mrg_chr, annotations_chr, anno_names = load_data(i, ref_df,path, anno_path, prop_nz, noise_size, param_dict['bim_prefix'], param_dict['sst_file'],param_dict['n_gwas'],param_dict['ref_dir'])
-            
+ 
             ld_blk = ld_blk + ld_blk_chr
             ld_blk_sym = ld_blk_sym + ld_blk_sym_chr
             blk_size = blk_size+ blk_size_chr
@@ -171,6 +170,7 @@ def check_sim_result(save_fig_name, anno_path, beta_prior_a = 0, use_sim_dict = 
             sst_dict = pd.concat([sst_dict, sst_dict_chr])
 
     sst_dict["BETA"] = beta_mrg
+    #sst_dict.to_csv('whole_genome_wightman.tsv', sep = '\t', index = False)
     
     if anno_path != None:
         anno_names.insert(0,'intercept')    

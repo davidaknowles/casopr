@@ -50,26 +50,22 @@ def simulate_sumstats(ld_blk, blk_size, n_gwas, n_variant, sst_dict, path, anno_
     if anno_path == False : ## perfect anno
         print('... simulating perfect anno...')
         if (use_sumstat_beta):  
-            print('... using real betas from sumstats ...')
-            beta_true = sst_dict['BETA']
-            nz = abs(beta_true) < prop_nz
- 
+            beta_true = torch.tensor(sst_dict['BETA']).float()
+            nz = torch.tensor(abs(beta_true) < prop_nz)
+            
         print('... add noise between +- %s for the perfect anno ...'% noise_size)
         noise = (2 * torch.rand(n_variant)- 1 )* noise_size
         perfect = nz
         nz = nz + noise
         #plot_perfect_anno_noise(nz,perfect, noise_size, path)
-
         annotations = torch.stack([torch.ones(n_variant),nz,torch.randn(n_variant)]).T # intercept, useful annotation, random annotation
         anno_names = ["perfect anno",'random anno']
 
     else: ## either use anno provided in anno_path (can be single, multiple, or none)
         annotations, anno_names = parse_genet.parse_anno(anno_path, sst_dict, chrom = chrom)
-    
-
-    
     beta_mrg = torch.zeros(n_variant)
     mm = 0
+    
     for kk in range(len(ld_blk)):
         idx_blk = torch.arange(mm,mm+blk_size[kk])
         ld_torch = torch.tensor(ld_blk[kk], dtype = torch.float)
@@ -80,6 +76,7 @@ def simulate_sumstats(ld_blk, blk_size, n_gwas, n_variant, sst_dict, path, anno_
         #ld_torch @ beta_true[idx_blk], 
         # covariance_matrix = ld_torch * sigma_over_sqrt_n**2).rsample()
         mm += blk_size[kk]
+        print('oh no')
     #annotations_double = annotations.double()
     
     

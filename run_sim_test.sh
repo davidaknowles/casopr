@@ -2,18 +2,18 @@
 
 # Define combinations of arguments
 arguments=(
-    "--save_fig_name prior_learnt_chr20_22 --beta_prior_a None"
-    "--save_fig_name prior_SB_chr20_22 --beta_prior_a 1"
-    "--save_fig_name prior_horseshoe_chr20_22 --beta_prior_a 0.5"
-    "--save_fig_name half_cauchy_chr20_22 --beta_prior_a 0"
-    "--save_fig_name inf_chr20_22 --beta_prior_a inf"
+    "--save_fig_name 36k_prior_learnt_chr1_22 --beta_prior_a None"
+    "--save_fig_name 36k_prior_SB_chr1_22 --beta_prior_a 1"
+    "--save_fig_name 36k_prior_horseshoe_chr1_22 --beta_prior_a 0.5"
+    "--save_fig_name 36k_half_cauchy_chr1_22 --beta_prior_a 0"
+    "--save_fig_name 36k_inf_chr1_22 --beta_prior_a inf"
 )
 
 # Submit jobs
 for args in "${arguments[@]}"; do
     sbatch << EOF
 #!/bin/bash
-#SBATCH --job-name='chr20_22_test'
+#SBATCH --job-name='chr1_22_36k'
 #SBATCH --partition=pe2
 #SBATCH --nodes=1           # minimum number of nodes to be allocated
 #SBATCH --ntasks=1          # number of tasks
@@ -24,7 +24,9 @@ for args in "${arguments[@]}"; do
 #SBATCH --mail-user=tlin@nygenome.org
 #SBATCH --output=/gpfs/commons/home/tlin/pic/casioPR/simulation/test_prior/%x_%j.log
 
+source /gpfs/commons/groups/knowles_lab/software/anaconda3/bin/activate
+conda activate polyfun
 
-python test_simulation.py $args --anno_path False --refit_time 20 --chrom_start 20	
+python test_simulation.py $args --anno_path False --refit_time 2 --chrom_start 1
 EOF
 done
