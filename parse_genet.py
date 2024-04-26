@@ -211,26 +211,48 @@ def parse_sumstats_no_vld(ref_dict,  sst_file, n_subj):
     return sst_df
 def parse_ldblk(ldblk_dir, sst_dict, chrom):
     print('... parse reference LD on chromosome %s ...' % chrom)
-
     if '1kg' in os.path.basename(ldblk_dir):
         chr_name = ldblk_dir + '/ldblk_1kg_chr' + str(chrom) + '.hdf5'
     elif 'ukbb' in os.path.basename(ldblk_dir):
         chr_name = ldblk_dir + '/ldblk_ukbb_chr' + str(chrom) + '.hdf5'
-
+    elif 'adsp' in ldblk_dir:
+        chr_name = ldblk_dir + '/ldblk_adsp_chr' + str(chrom) + '.hdf5'
+    
+    
     hdf_chr = h5py.File(chr_name, 'r') ## read ldblk(in hdf5 format)
     n_blk = len(hdf_chr)
-    ld_blk = [sp.array(hdf_chr['blk_'+str(blk)]['ldblk']) for blk in range(1,n_blk+1)]
-
+    ld_blk = []
     snp_blk = []
-    for blk in range(1,n_blk+1):
-        snp_blk.append([bb.decode("UTF-8") for bb in list(hdf_chr['blk_'+str(blk)]['snplist'])])
+    skip_blk = 0
+    for blk in range(1, n_blk + 1):
+        try:
+            # Try to access the 'ldblk' dataset for each block in the HDF5 file
+            ld_blk.append(sp.array(hdf_chr['blk_' + str(blk)]['ldblk']))
+            snp_blk.append([bb.decode("UTF-8") for bb in list(hdf_chr['blk_'+str(blk)]['snplist'])])
+        except KeyError:
+            # If the block does not exist, skip it and continue the loop
+            print(f"Object 'blk_{blk}' doesn't have any SNPs, skipping the block.")
+            skip_blk +=1 
+            
+            
+#    ld_blk = [sp.array(hdf_chr['blk_'+str(blk)]['ldblk']) for blk in range(1,n_blk+1)]
+    # snp_blk = []
+    # for blk in range(1,n_blk+1):
+    #     try:
+    #         # Try to access the 'ldblk' dataset for each block in the HDF5 file
+    #         snp_blk.append([bb.decode("UTF-8") for bb in list(hdf_chr['blk_'+str(blk)]['snplist'])])
+    #     except KeyError:
+    #         skip_blk +=1 
+    #     #snp_blk.append([bb.decode("UTF-8") for bb in list(hdf_chr['blk_'+str(blk)]['snplist'])])
 
     blk_size = []
     ld_blk_sym = [] #symmetric matrices -> to gets eigen values
     ld_blk_filt = [] # get the correctly flipped ones
     mm = 0 ## mm is the number of SNPs
     
-    for blk in range(n_blk):
+    print(f"skipping {skip_blk} blk")
+
+    for blk in range(n_blk-skip_blk):
         idx = [ii for (ii, snp) in enumerate(snp_blk[blk]) if snp in sst_dict['SNP'].to_numpy() ]
         #print(len(idx))
         if len(idx) == 0: 
@@ -250,7 +272,6 @@ def parse_ldblk(ldblk_dir, sst_dict, chrom):
         ld_blk_sym.append( (ld_blk_here+ld_blk_here.T)/2 )
 
         mm += len(idx)
-        
     return ld_blk_filt, ld_blk_sym, blk_size
 
 

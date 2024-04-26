@@ -31,7 +31,7 @@ def plot_perfect_anno_noise(noise, perfect, noise_size, path):
     
     
 ## add anno
-def simulate_sumstats(ld_blk, blk_size, n_gwas, n_variant, sst_dict, path, anno_path=None, prop_nz = 0.2, beta_sd = 0.1, sigma_noise = 1., chrom=22, use_sumstat_beta = False,  noise_size = 0.1): 
+def simulate_sumstats(ld_blk, blk_size, n_gwas, n_variant, sst_dict, path, anno_path=None, prop_nz = 0.2, beta_sd = 0.1, sigma_noise = 1., chrom=22, use_sumstat_beta = True,  noise_size = 0.1): 
     
     sigma_over_sqrt_n = sigma_noise / torch.sqrt(torch.tensor(n_gwas))
     #print('prop_nz = %f'%prop_nz)
@@ -76,7 +76,6 @@ def simulate_sumstats(ld_blk, blk_size, n_gwas, n_variant, sst_dict, path, anno_
         #ld_torch @ beta_true[idx_blk], 
         # covariance_matrix = ld_torch * sigma_over_sqrt_n**2).rsample()
         mm += blk_size[kk]
-        print('oh no')
     #annotations_double = annotations.double()
     
     

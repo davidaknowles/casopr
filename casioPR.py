@@ -21,7 +21,6 @@ import sys
 import getopt
 
 import argparse
-
     
     
 def sim_result_dict():
@@ -113,7 +112,7 @@ def parse_param():
 
 def main():
     sim_result_dict()
-    #check_sim_result(args.save_fig_name, args.anno_path, args.test_on, refit_time = args.refit_time, prop_nz = args.prop_nz, phi_as_prior = args.phi_as_prior,  constrain_sigma = args.constrain_sigma, lr = args.lr, chrom = args.chrom)
+    check_sim_result(args.save_fig_name, args.anno_path, args.test_on, refit_time = args.refit_time, prop_nz = args.prop_nz, phi_as_prior = args.phi_as_prior,  constrain_sigma = args.constrain_sigma, lr = args.lr, chrom = args.chrom)
     
 if __name__ == '__main__':
     main()
