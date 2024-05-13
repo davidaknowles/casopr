@@ -93,12 +93,22 @@ def check_sim_result(save_fig_name, anno_path, beta_prior_a = 0, use_sim_dict = 
     use_sim_dict = bool(use_sim_dict)
     #17k 'bim_prefix' : '/gpfs/commons/groups/knowles_lab/data/ADSP_reguloML/ADSP_vcf/17K_final/annotated_filtered_hg37/plink/vcf_filt/ADSP_annotated_chr',
     ## prscs_ref:/gpfs/commons/groups/knowles_lab/data/ADSP_reguloML/LD_PRScs/ldblk_ukbb_eur
+    ## 'test_data/wightman4prscs.tsv'
     chr_dict = { 
     'bim_prefix' : '/gpfs/commons/groups/knowles_lab/data/ADSP_reguloML/ADSP_vcf/36K_QC/annotated_hg37_plink_ibd/qc/qc_chr',
     'sst_file' : 'test_data/wightman4prscs.tsv',
-    'n_gwas' : 762971
+    'n_gwas' : 762971,
+    'ref_dir':'/gpfs/commons/groups/knowles_lab/data/ADSP_reguloML/LD_PRScs/ldblk_ukbb_eur'
     }
-    
+
+    ## this is bellenguez hg38
+    adsp_dict = {
+    'bim_prefix' : '/gpfs/commons/groups/knowles_lab/data/ADSP_reguloML/ADSP_vcf/36K_QC/annotated_hg38_plink/ADSP.chr',
+    'sst_file' : '/gpfs/commons/groups/knowles_lab/data/ADSP_reguloML/summary_stats/alzheimers/fixed_alzheimers/processed/prscs/bellenguez_hg38_4prscs.tsv',
+    'n_gwas' : 487511,
+    'ref_dir':'/gpfs/commons/groups/knowles_lab/data/ADSP_reguloML/LD_PRScs/ldblk_ukbb_eur'
+    }
+
     sim_dict = {
         'bim_prefix' : "test_data/test",
         'sst_file' : "test_data/sumstats.txt",
@@ -110,7 +120,8 @@ def check_sim_result(save_fig_name, anno_path, beta_prior_a = 0, use_sim_dict = 
         print('simulate 1k SNP')
         
     else:
-        param_dict = chr_dict
+        param_dict = adsp_dict
+
     param_dict['ref_dir']='/gpfs/commons/groups/knowles_lab/data/ADSP_reguloML/LD_ADSP36K_4PRScs/snps_only/ldblk_adsp_chr/' ## ADSP ld
     param_dict['n_iter'] = 1000
     
