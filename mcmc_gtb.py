@@ -10,7 +10,7 @@ import scipy as sp
 from scipy import linalg 
 from numpy import random
 import gigrnd
-
+import numpy as np
 
 def mcmc(a, b, phi, sst_dict, n, ld_blk, blk_size, n_iter, n_burnin, thin, chrom, out_dir, beta_std, seed):
     print('... MCMC ...')
@@ -52,7 +52,19 @@ def mcmc(a, b, phi, sst_dict, n, ld_blk, blk_size, n_iter, n_burnin, thin, chrom
             else:
                 idx_blk = range(mm,mm+blk_size[kk])
                 dinvt = ld_blk[kk]+sp.diag(1.0/psi[idx_blk].T[0])
-                dinvt_chol = linalg.cholesky(dinvt)
+                
+                try: # faster than the eigendecomposition if already PSD
+                    dinvt_chol = np.linalg.cholesky(dinvt)
+                except np.linalg.LinAlgError: 
+                    L, V = np.linalg.eigh(dinvt)
+                    dinvt_min_eig = L.min().item()
+                    desired_min_eig = 1e-6
+                    if dinvt_min_eig < desired_min_eig: 
+                        print("Degenerate cov (min eigenvalue=%1.3e)" % dinvt_min_eig)
+                        # smallest addition to diagonal to make min(eig) = min_eig
+                        dinvt += (desired_min_eig - dinvt_min_eig) * np.eye(blk_size[kk])
+                    dinvt_chol = np.linalg.cholesky(dinvt)
+                    
                 beta_tmp = linalg.solve_triangular(dinvt_chol, beta_mrg[idx_blk], trans='T') + sp.sqrt(sigma/n)*random.randn(len(idx_blk),1)
                 beta[idx_blk] = linalg.solve_triangular(dinvt_chol, beta_tmp, trans='N')
                 quad += sp.dot(sp.dot(beta[idx_blk].T, dinvt), beta[idx_blk])

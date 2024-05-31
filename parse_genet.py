@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+##CASIOPR
 
 """
 Parse the reference panel, summary statistics, validation set, and annotations.
@@ -233,24 +234,26 @@ def parse_ldblk(ldblk_dir, sst_dict, chrom):
             # If the block does not exist, skip it and continue the loop
             print(f"Object 'blk_{blk}' doesn't have any SNPs, skipping the block.")
             skip_blk +=1 
-            
-            
-#    ld_blk = [sp.array(hdf_chr['blk_'+str(blk)]['ldblk']) for blk in range(1,n_blk+1)]
-    # snp_blk = []
-    # for blk in range(1,n_blk+1):
-    #     try:
-    #         # Try to access the 'ldblk' dataset for each block in the HDF5 file
-    #         snp_blk.append([bb.decode("UTF-8") for bb in list(hdf_chr['blk_'+str(blk)]['snplist'])])
-    #     except KeyError:
-    #         skip_blk +=1 
-    #     #snp_blk.append([bb.decode("UTF-8") for bb in list(hdf_chr['blk_'+str(blk)]['snplist'])])
 
     blk_size = []
     ld_blk_sym = [] #symmetric matrices -> to gets eigen values
     ld_blk_filt = [] # get the correctly flipped ones
     mm = 0 ## mm is the number of SNPs
-    
     print(f"skipping {skip_blk} blk")
+    
+#     ## check if there's na in the ld
+#     arr_ld = np.array(ld_blk)
+#     nan_ld = np.isnan(arr_ld)
+#     print(nan_ld)
+#     if nan_count > 0 :
+#         arr_ld[nan_mask] = 0
+#         arr_ld  = np.nan_to_num(arr_ld , nan=0) ## fixing nan
+#         print(f"convert {count_nan} nan values to 0")
+#         ld_blk = arr_ld.tolist()
+    
+    
+    
+    
 
     for blk in range(n_blk-skip_blk):
         idx = [ii for (ii, snp) in enumerate(snp_blk[blk]) if snp in sst_dict['SNP'].to_numpy() ]
@@ -258,8 +261,7 @@ def parse_ldblk(ldblk_dir, sst_dict, chrom):
         if len(idx) == 0: 
             continue
             
-        blk_size.append(len(idx))
-        
+        blk_size.append(len(idx))        
         idx_blk = np.arange(mm,mm+len(idx))
         flip = sst_dict['FLP'][idx_blk]
         ld_blk_here = ld_blk[blk][sp.ix_(idx,idx)]*sp.outer(flip,flip)
@@ -272,59 +274,6 @@ def parse_ldblk(ldblk_dir, sst_dict, chrom):
         ld_blk_sym.append( (ld_blk_here+ld_blk_here.T)/2 )
 
         mm += len(idx)
-    return ld_blk_filt, ld_blk_sym, blk_size
-
-
-
-def parse_ldblk_test(ldblk_dir, sst_dict, chrom, sim=False):
-    #print('... parse reference LD on chromosome %s ...' % chrom)
-
-    if '1kg' in os.path.basename(ldblk_dir):
-        chr_name = ldblk_dir + '/ldblk_1kg_chr' + str(chrom) + '.hdf5'
-    elif 'ukbb' in os.path.basename(ldblk_dir):
-        chr_name = ldblk_dir + '/ldblk_ukbb_chr' + str(chrom) + '.hdf5'
-
-    hdf_chr = h5py.File(chr_name, 'r') ## read ldblk(in hdf5 format)
-    n_blk = len(hdf_chr)
-    ld_blk = [sp.array(hdf_chr['blk_'+str(blk)]['ldblk']) for blk in range(1,n_blk+1)]
-
-    snp_blk = []
-    for blk in range(1,n_blk+1):
-        snp_blk.append([bb.decode("UTF-8") for bb in list(hdf_chr['blk_'+str(blk)]['snplist'])])
-
-    blk_size = []
-    ld_blk_sym = [] #symmetric matrices -> to gets eigen values
-    ld_blk_filt = [] # get the correctly flipped ones
-    mm = 0 ## mm is the number of SNPs
-    for blk in range(n_blk):
-        ## getes the blks where the SNPs were found in the intersection sst_dict
-        if sim:
-            print('sim')
-            idx = [ii for (ii, snp) in enumerate(snp_blk[blk])] 
-            print(len(idx))
-    
-        else:
-            idx = [ii for (ii, snp) in enumerate(snp_blk[blk]) if snp in sst_dict['SNP'].to_numpy()]
-            
-        #print(len(idx))
-        if len(idx) == 0: 
-            continue
-        
-        blk_size.append(len(idx))
-        
-        idx_blk = np.arange(mm,mm+len(idx))
-        flip = sst_dict['FLP'][idx_blk]
-        ld_blk_here = ld_blk[blk][sp.ix_(idx,idx)]*sp.outer(flip,flip)
-        ld_blk_filt.append(ld_blk_here)
-        
-        #_, s, v = linalg.svd(ld_blk_here)
-        #h = sp.dot(v.T, sp.dot(sp.diag(s), v)) # just weird way of getting transpose?! 
-        #ld_blk_sym.append( (ld_blk_here+h)/2 )
-        
-        ld_blk_sym.append( (ld_blk_here+ld_blk_here.T)/2 )
-
-        mm += len(idx)
-        
     return ld_blk_filt, ld_blk_sym, blk_size
 
 

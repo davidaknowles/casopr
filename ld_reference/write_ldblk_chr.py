@@ -7,7 +7,7 @@ import numpy as np
 import h5py,os,sys
 
 chr = sys.argv[1]
-BLK_DIR = '/gpfs/commons/groups/knowles_lab/data/ADSP_reguloML/LD_ADSP36K_4PRScs/snps_only'
+BLK_DIR = '/gpfs/commons/groups/knowles_lab/data/ADSP_reguloML/LD_ADSP36K_4PRScs/not_na'
 
 LABEL = "adsp"
 # with open(os.path.join(BLK_DIR,'count','blk_chr'+chr)) as ff:
@@ -37,6 +37,11 @@ for blk in range(1,n_blk+1):
         #read actual ld matrix
         with open(blk_root + '.ld') as ff:
             ld = [[float(val) for val in (line.strip()).split()] for line in ff]
+            nan_count = np.isnan(ld).sum()
+            if nan_count > 0 :
+                ld = np.nan_to_num(ld, nan=0)
+                print("convert %d nan to 0"%nan_count)
+                
         print(f'blk {blk} {np.shape(ld)}')
 
         #get blocksnplist  
