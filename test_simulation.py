@@ -11,7 +11,6 @@ python test_simulation.py --save_fig_name --anno_path --test_on (defult sim) --r
 import os
 import sys
 import getopt
-
 import parse_genet
 import vi
 
@@ -79,34 +78,36 @@ def load_data(chrom,ref_df,  path, anno_path, prop_nz, noise_size, bim_prefix, s
     # vld_df = parse_genet.parse_bim(bim_prefix + ".bim")
     # vld_df = vld_df[vld_df.CHR == chrom]
     vld_df = parse_genet.parse_bim(bim_prefix + "%s.bim"%chrom) if sst_file_name != "test_data/sumstats.txt" else parse_genet.parse_bim(bim_prefix + ".bim")
-    sst_dict = parse_genet.parse_sumstats(ref_df, vld_df, sst_file_name, n_gwas)
-#    sst_dict = parse_genet.parse_sumstats_no_vld(ref_df, sst_file_name, n_gwas)
+    #sst_dict = parse_genet.parse_sumstats(ref_df, vld_df, sst_file_name, n_gwas)
+    sst_dict = parse_genet.parse_sumstats_no_vld(ref_df, sst_file_name, n_gwas)
     
     ld_blk, ld_blk_sym, blk_size = parse_genet.parse_ldblk(ref_dir, sst_dict, chrom)
     print("There are %s ld_block. in chr%s\n" %(len(ld_blk),chrom))
-    beta_true, beta_mrg, annotations, anno_names = simulate.simulate_sumstats(ld_blk, blk_size, n_gwas, len(sst_dict), sst_dict, path, anno_path = anno_path, chrom=chrom,prop_nz = prop_nz, noise_size = noise_size)
+    beta_true, beta_mrg, annotations, anno_names = simulate.simulate_sumstats(ld_blk, blk_size, n_gwas, len(sst_dict), sst_dict, path, anno_path = anno_path, chrom=chrom,prop_nz = prop_nz, noise_size = noise_size,use_sumstat_beta = False)
     print('finish load')
     return ref_df, vld_df, sst_dict, ld_blk, ld_blk_sym, blk_size, beta_true, beta_mrg, annotations, anno_names
 
-def check_sim_result(save_fig_name, anno_path, beta_prior_a = 0, use_sim_dict = False, gaussian_anno_weight = True, noise_size = 0, refit_time = 10,prop_nz = 0.2, phi_as_prior = False, constrain_sigma = True, lr = 0.03, chrom=22, run_prscs = True):
+def check_sim_result(save_fig_name, anno_path, beta_prior_a = 0, use_sim_dict = False, gaussian_anno_weight = True, noise_size = 0, refit_time = 10,prop_nz = 0.2, phi_as_prior = False, constrain_sigma = True, lr = 0.03, chrom=22, run_prscs = True, which_dict = 'wightman19'):
     ## initializing
     use_sim_dict = bool(use_sim_dict)
     #17k 'bim_prefix' : '/gpfs/commons/groups/knowles_lab/data/ADSP_reguloML/ADSP_vcf/17K_final/annotated_filtered_hg37/plink/vcf_filt/ADSP_annotated_chr',
     ## prscs_ref:/gpfs/commons/groups/knowles_lab/data/ADSP_reguloML/LD_PRScs/ldblk_ukbb_eur
     ## 'test_data/wightman4prscs.tsv'
-    chr_dict = { 
-    'bim_prefix' : '/gpfs/commons/groups/knowles_lab/data/ADSP_reguloML/ADSP_vcf/36K_QC/annotated_hg37_plink_ibd/qc/qc_chr',
+    wightman_dict = { 
     'sst_file' : 'test_data/wightman4prscs.tsv',
-    'n_gwas' : 762971,
-    'ref_dir':'/gpfs/commons/groups/knowles_lab/data/ADSP_reguloML/LD_PRScs/ldblk_ukbb_eur'
+    'n_gwas' : 762971
     }
-
+    
+    bellenguez_hg19 = { 
+    'sst_file' : '/gpfs/commons/groups/knowles_lab/data/ADSP_reguloML/summary_stats/alzheimers/fixed_alzheimers/processed/prscs/bellenguez_4prscs.tsv',
+    'n_gwas' : 487511}
+   
     ## this is bellenguez hg38
-    adsp_dict = {
+    bellenguez_hg38 = {
     'bim_prefix' : '/gpfs/commons/groups/knowles_lab/data/ADSP_reguloML/ADSP_vcf/36K_QC/annotated_hg38_plink/ADSP.chr',
     'sst_file' : '/gpfs/commons/groups/knowles_lab/data/ADSP_reguloML/summary_stats/alzheimers/fixed_alzheimers/processed/prscs/bellenguez_hg38_4prscs.tsv',
-    'n_gwas' : 487511,
-    'ref_dir':'/gpfs/commons/groups/knowles_lab/data/ADSP_reguloML/LD_PRScs/ldblk_ukbb_eur'
+    'n_gwas' : 487511, 
+    'ref_dir':'/gpfs/commons/groups/knowles_lab/data/ADSP_reguloML/LD_ADSP36K_4PRScs/not_na/ldblk_adsp_chr/'
     }
 
     sim_dict = {
@@ -115,15 +116,27 @@ def check_sim_result(save_fig_name, anno_path, beta_prior_a = 0, use_sim_dict = 
         'n_gwas' : 200000
     }
     
-    if use_sim_dict :
+    if use_sim_dict:
         param_dict = sim_dict
         print('simulate 1k SNP')
-        
     else:
-        param_dict = adsp_dict
+        if which_dict == "bellenguez38":
+            param_dict = bellenguez_hg38
+            print('use adsp LD')
+        else:
+            print('use UKBB LD')
+            if which_dict == "bellenguez19":
+                param_dict = bellenguez_hg19
+            elif which_dict == "wightman":
+                param_dict = wightman_dict
+                
+            param_dict['ref_dir'] = '/gpfs/commons/groups/knowles_lab/data/ADSP_reguloML/LD_PRScs/ldblk_ukbb_eur'
+            param_dict['bim_prefix'] =  '/gpfs/commons/groups/knowles_lab/data/ADSP_reguloML/ADSP_vcf/36K_QC/annotated_hg38_plink/ADSP.chr'
 
-    param_dict['ref_dir']='/gpfs/commons/groups/knowles_lab/data/ADSP_reguloML/LD_ADSP36K_4PRScs/snps_only/ldblk_adsp_chr/' ## ADSP ld
     param_dict['n_iter'] = 1000
+    
+    for key,value in param_dict.items():
+        print(str(key) + ": " + str(value))
     
     ## change the parameters to the right dtypes
     if type(refit_time == str):
@@ -151,7 +164,7 @@ def check_sim_result(save_fig_name, anno_path, beta_prior_a = 0, use_sim_dict = 
     elif 'ukbb' in os.path.basename(param_dict['ref_dir']):
         ref_df = parse_genet.parse_ref(param_dict['ref_dir'] + '/snpinfo_ukbb_hm3')
     elif 'ldblk_adsp_chr' in param_dict['ref_dir']:
-        ref_df = parse_genet.parse_ref(param_dict['ref_dir'] + '/v2snpinfo_adsp_hm3')
+        ref_df = parse_genet.parse_ref(param_dict['ref_dir'] + '/snpinfo_adsp_hm3_2')
 
     if (chrom == 22):
         print('running on chr%s'%chrom)
@@ -182,12 +195,12 @@ def check_sim_result(save_fig_name, anno_path, beta_prior_a = 0, use_sim_dict = 
     
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     
+    betas = pd.DataFrame({'beta_true':beta_true, 'beta_marginal':beta_mrg})
     print("... start VI...")
     plt.figure()
     anno_list=pd.DataFrame()
-    betas = pd.DataFrame({'beta_true':beta_true, 'beta_marginal':beta_mrg})
+    
     betas.to_csv(path+'betas.tsv', sep = '\t', index = False)
-    print(betas)
     for i in tqdm(range(refit_time)):
         print('Re-train the model %d time(s)'% (i+1))
         losses, beta, phi_est, stats =  vi.vi(sst_dict, param_dict['n_gwas'], ld_blk, blk_size, device = device, annotations = annotations, max_iterations = param_dict['n_iter'], beta_prior_a = beta_prior_a, max_particles=4, desired_min_eig = 1e-3, min_iterations = 200, stall_window = 30, phi_as_prior = phi_as_prior, lr = lr, constrain_sigma = constrain_sigma, gaussian_anno_weight = gaussian_anno_weight, path = path)
@@ -216,6 +229,14 @@ def check_sim_result(save_fig_name, anno_path, beta_prior_a = 0, use_sim_dict = 
     
     #  plot pearson r between the marginal beta and betea of PRSCS/CasioPR 
     plot_pearsonr(beta_stats, run_prscs, refit_time, path)
+    
+    
+    beta_stats = get_beta_stats(betas)
+    beta_stats.to_csv(path+'betas_stat.tsv', sep = '\t', index = False)
+    
+    #  plot pearson r between the marginal beta and betea of PRSCS/CasioPR 
+    plot_pearsonr(beta_stats, run_prscs, refit_time, path)
+    
          
 
     ##  check anno_weight (only when annotation exist)
@@ -230,16 +251,6 @@ def check_sim_result(save_fig_name, anno_path, beta_prior_a = 0, use_sim_dict = 
         print('anno_weight')
         print(anno_list)
         
-        ## only_for_perfect_anno
-            # plt.figure()
-            # correlation = anno_list.iloc[:][1].corr(anno_list.iloc[:][2])
-            # sns.regplot(anno_list.iloc[:][1],anno_list.iloc[:][2], ci=None,marker="p", color="b", line_kws=dict(color="r", alpha = 0.5))
-            # plt.text(anno_list.iloc[:][1].mean(), anno_list.iloc[:][2].mean(), f'Correlation: {correlation:.2f}', fontsize=12, color='blue', va='top',ha='center')
-            # # plt.plot(anno_list.iloc[:][1],anno_list.iloc[:][2], marker='X', linestyle='None', color='y')
-            # plt.xlabel('perfect anno')
-            # plt.ylabel('random anno')
-            # plt.title('annotation weights')
-            # plt.savefig(path+'anno_weight_scatter.pdf',format ='pdf');plt.show()   
     return(anno_list,betas)   
 
 if __name__ == "__main__":
@@ -253,6 +264,7 @@ if __name__ == "__main__":
     parser.add_argument("--lr", type=float, default=0.03, help="Learning rate (default: 0.03)")
     parser.add_argument("--chrom_start", type=int, default=21, help="Chromosome (default: 21)")
     parser.add_argument("--use_sim_dict", type=bool, default=False, help="load dict from real data or the simulated one from PRSCS(default False)")
+    parser.add_argument("--which_dict", type=str, default='wightman', help="which sumstat and LD to use")
     #parser.add_argument("--use_sim", action='store_true',help="load dict from real data or the simulated one from PRSCS(default False)")
     args = parser.parse_args()
     print(' ')
@@ -266,7 +278,7 @@ if __name__ == "__main__":
     print(' ')
    
     print('====== Start Running CasioPR ====== \n')
-    check_sim_result(args.save_fig_name, args.anno_path,beta_prior_a = args.beta_prior_a,  gaussian_anno_weight = args.gaussian_anno_weight, noise_size = args.noise_size, refit_time = args.refit_time, lr = args.lr, chrom = args.chrom_start, use_sim_dict = args.use_sim_dict)
+    check_sim_result(args.save_fig_name, args.anno_path,beta_prior_a = args.beta_prior_a,  gaussian_anno_weight = args.gaussian_anno_weight, noise_size = args.noise_size, refit_time = args.refit_time, lr = args.lr, chrom = args.chrom_start, use_sim_dict = args.use_sim_dict, which_dict = args.which_dict)
     
 
     

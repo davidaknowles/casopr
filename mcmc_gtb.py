@@ -2,7 +2,7 @@
 
 """
 Markov Chain Monte Carlo (MCMC) sampler for polygenic prediction with continuous shrinkage (CS) priors.
-
+FOR prscs
 """
 
 
@@ -53,7 +53,7 @@ def mcmc(a, b, phi, sst_dict, n, ld_blk, blk_size, n_iter, n_burnin, thin, chrom
                 idx_blk = range(mm,mm+blk_size[kk])
                 dinvt = ld_blk[kk]+sp.diag(1.0/psi[idx_blk].T[0])
                 
-                try: # faster than the eigendecomposition if already PSD
+                try: # fix the not positive definite error from cholesky matrix
                     dinvt_chol = np.linalg.cholesky(dinvt)
                 except np.linalg.LinAlgError: 
                     L, V = np.linalg.eigh(dinvt)
@@ -74,9 +74,17 @@ def mcmc(a, b, phi, sst_dict, n, ld_blk, blk_size, n_iter, n_burnin, thin, chrom
         sigma = 1.0/random.gamma((n+p)/2.0, 1.0/err)
 
         delta = random.gamma(a+b, 1.0/(psi+phi))
-
+        
+        
         for jj in range(p):
+            ## fix the 0 in denominator 
+            if beta[jj] == 0:
+                beta[jj] += 1e-6
+                beta_zero = beta_zero + 1
             psi[jj] = gigrnd.gigrnd(a-0.5, 2.0*delta[jj], n*beta[jj]**2/sigma)
+            
+        print('...set %d SNPs with beta = 0 to 10e-6...'%beta_zero)
+       
         psi[psi>1] = 1.0
 
         if phi_updt == True:
