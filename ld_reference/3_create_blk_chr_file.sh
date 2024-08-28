@@ -7,6 +7,8 @@
 #SBATCH --array=1-9%7
 #SBATCH --output=/gpfs/commons/groups/knowles_lab/data/ADSP_reguloML/LD/LD_ADSP36K_4PRScs_Aug/count/%x_%j.log
 
+source /gpfs/commons/groups/knowles_lab/software/anaconda3/bin/activate
+conda activate polyfun
 
 #dir_blk="/gpfs/commons/groups/knowles_lab/data/ADSP_reguloML/LD_ADSP36K_4PRScs/"
 dir_blk="/gpfs/commons/groups/knowles_lab/data/ADSP_reguloML/LD/LD_ADSP36K_4PRScs_Aug/"
@@ -53,6 +55,6 @@ if grep -q '\b0\b' count/chr${chr}_blk_size; then
     echo "there is empty block"
 fi 
 #echo 'creating h5 files... '
-python /gpfs/commons/home/tlin/script/casopr/ld_reference/write_ldblk_chr.py $chr
+python /gpfs/commons/home/tlin/script/casopr/ld_reference/write_ldblk_chr.py $chr $dir_blk
 
 
