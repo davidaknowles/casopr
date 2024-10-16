@@ -9,8 +9,9 @@ import numpy as np
 import h5py,os,sys
 
 print('run + chr', sys.argv[1])
-BLK_DIR = '/gpfs/commons/groups/knowles_lab/data/ADSP_reguloML/LD_ADSP36K_4PRScs/'
+
 chr= sys.argv[1]
+BLK_DIR = sys.argv[2]
 LABEL = "adsp"
 
 with open(os.path.join(BLK_DIR,'count','blk_chr'+chr)) as ff:
